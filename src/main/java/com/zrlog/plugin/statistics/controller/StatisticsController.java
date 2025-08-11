@@ -71,15 +71,15 @@ public class StatisticsController {
     }
 
     public void img() {
-        session.sendMsg(new MsgPacket(("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
+        session.sendMsg(new MsgPacket("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
                 "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
-                "</svg>").getBytes(), ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+                "</svg>", ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
         Map<String, Object> keyMap = new HashMap<>();
         String[] path = requestInfo.getParam().get("path");
         if (path == null || path.length == 0) {
             return;
         }
-        String aliasKey = path[0];
+        String aliasKey = path[0].replace("/", "").replace(".html", "");
         keyMap.put("alias", aliasKey);
         session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
             @Override
