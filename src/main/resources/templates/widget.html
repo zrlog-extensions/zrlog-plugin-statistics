@@ -2,6 +2,6 @@
     window.onload = function () {
         console.info(window.location.href);
         var img = new Image();
-        img.src = '${host}/p/statistics/img?path=' + encodeURI(window.location.pathname);
+        img.src = '${host}/p/statistics/img?path=' + encodeURIComponent(window.location.pathname);
     }
 </script>
