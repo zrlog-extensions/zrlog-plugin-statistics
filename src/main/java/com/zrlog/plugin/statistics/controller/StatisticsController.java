@@ -13,6 +13,8 @@ import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.type.ActionType;
 import com.zrlog.plugin.type.RunType;
 
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -79,7 +81,7 @@ public class StatisticsController {
         if (path == null || path.length == 0) {
             return;
         }
-        String aliasKey = path[0].replace("/", "").replace(".html", "");
+        String aliasKey = URLDecoder.decode(path[0], Charset.defaultCharset()).replace("/", "").replace(".html", "");
         keyMap.put("alias", aliasKey);
         session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
             @Override
