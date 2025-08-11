@@ -1,20 +1,27 @@
 package com.zrlog.plugin.statistics.controller;
 
 import com.google.gson.Gson;
+import com.zrlog.plugin.IMsgPacketCallBack;
 import com.zrlog.plugin.IOSession;
+import com.zrlog.plugin.RunConstants;
 import com.zrlog.plugin.common.IdUtil;
+import com.zrlog.plugin.common.LoggerUtil;
 import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.type.ActionType;
+import com.zrlog.plugin.type.RunType;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 public class StatisticsController {
 
+
+    private static final Logger LOGGER = LoggerUtil.getLogger(StatisticsController.class);
 
     private final IOSession session;
     private final MsgPacket requestPacket;
@@ -64,6 +71,23 @@ public class StatisticsController {
     }
 
     public void img() {
-        session.sendMsg(new MsgPacket("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==".getBytes(), ContentType.BYTE, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+        session.sendMsg(new MsgPacket(("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
+                "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
+                "</svg>").getBytes(), ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+        Map<String, Object> keyMap = new HashMap<>();
+        String[] path = requestInfo.getParam().get("path");
+        if (path == null || path.length == 0) {
+            return;
+        }
+        String aliasKey = path[0];
+        keyMap.put("alias", aliasKey);
+        session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
+            @Override
+            public void handler(MsgPacket responseMsgPacket) {
+                if (RunConstants.runType == RunType.DEV) {
+                    LOGGER.info("Report " + aliasKey + " success.");
+                }
+            }
+        });
     }
 }
