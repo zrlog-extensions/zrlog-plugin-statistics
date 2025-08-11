@@ -7,6 +7,7 @@
         params.push("screenWidth=" + screen.width)
         params.push("screenHeight=" + screen.height);
         params.push("windowWidth=" + window.innerWidth);
+        params.push("devicePixelRatio=" + window.devicePixelRatio);
         img.src = "${host}/p/statistics/img?" + params.join("&");
     }
 </script>
