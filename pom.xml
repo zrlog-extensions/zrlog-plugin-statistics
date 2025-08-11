@@ -136,6 +136,7 @@
                                     -Ob
                                     --enable-sbom
                                     -H:+BuildReport
+                                    -H:+AddAllCharsets
                                     -H:+UnlockExperimentalVMOptions
                                     --initialize-at-build-time=sun.security.krb5.SCDynamicStoreConfig
                                     --initialize-at-build-time=java.util.ImmutableCollections$ListN
