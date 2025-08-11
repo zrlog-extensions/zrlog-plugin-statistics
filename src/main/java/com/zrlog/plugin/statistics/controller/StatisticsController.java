@@ -28,9 +28,9 @@ public class StatisticsController {
     private final IOSession session;
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
-    private static final String SVG_STR = "\"<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"1\\\" height=\\\"1\\\">\\n\" +\n" +
-            "                    \"  <rect width=\\\"1\\\" height=\\\"1\\\" fill=\\\"transparent\\\"/>\\n\" +\n" +
-            "                    \"</svg>";
+    private static final String SVG_STR = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
+            "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
+            "</svg>";
 
     public StatisticsController(IOSession session, MsgPacket requestPacket, HttpRequestInfo requestInfo) {
         this.session = session;
