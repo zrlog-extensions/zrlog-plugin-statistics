@@ -70,6 +70,8 @@ public class StatisticsController {
             Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
             if (Objects.isNull(map.get("host"))) {
                 map.put("host", "");
+            } else {
+                map.put("host", "//" + map.get("host"));
             }
             session.responseHtml("/templates/widget.html", map, requestPacket.getMethodStr(), requestPacket.getMsgId());
         });
