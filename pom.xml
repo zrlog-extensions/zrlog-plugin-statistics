@@ -141,9 +141,11 @@
                                     --initialize-at-build-time=sun.security.krb5.SCDynamicStoreConfig
                                     --initialize-at-build-time=java.util.ImmutableCollections$ListN
                                     --trace-class-initialization=sun.security.krb5.SCDynamicStoreConfig
-                                    -H:+UnlockExperimentalVMOptions
-                                    -march=compatibility --enable-preview -H:DashboardDump=${imageName}
-                                    -H:+DashboardAll -H:IncludeResources= --enable-url-protocols=http --enable-url-protocols=https --enable-monitoring=heapdump
+                                    -march=compatibility
+                                    --enable-preview
+                                    -H:DashboardDump=${imageName}
+                                    -H:+DashboardAll
+                                    -H:IncludeResources=
                                 </arg>
                             </buildArgs>
                             <mainClass>${native.image.mainClass}</mainClass>
