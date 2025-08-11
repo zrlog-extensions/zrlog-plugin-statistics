@@ -1,0 +1,17 @@
+.idea
+**/logs
+*.pid
+*.jar
+*.iml
+**/target
+**/temp/**
+/build/
+
+.settings
+.classpath
+.project
+*.*~
+*.log
+*.log.lck
+!.mvn/wrapper/maven-wrapper.jar
+.DS_Store

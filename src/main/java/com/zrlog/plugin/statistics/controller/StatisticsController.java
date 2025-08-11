@@ -1,0 +1,69 @@
+package com.zrlog.plugin.statistics.controller;
+
+import com.google.gson.Gson;
+import com.zrlog.plugin.IOSession;
+import com.zrlog.plugin.common.IdUtil;
+import com.zrlog.plugin.data.codec.ContentType;
+import com.zrlog.plugin.data.codec.HttpRequestInfo;
+import com.zrlog.plugin.data.codec.MsgPacket;
+import com.zrlog.plugin.data.codec.MsgPacketStatus;
+import com.zrlog.plugin.type.ActionType;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+public class StatisticsController {
+
+
+    private final IOSession session;
+    private final MsgPacket requestPacket;
+    private final HttpRequestInfo requestInfo;
+
+    public StatisticsController(IOSession session, MsgPacket requestPacket, HttpRequestInfo requestInfo) {
+        this.session = session;
+        this.requestPacket = requestPacket;
+        this.requestInfo = requestInfo;
+    }
+
+    public void update() {
+        session.sendMsg(new MsgPacket(requestInfo.simpleParam(), ContentType.JSON, MsgPacketStatus.SEND_REQUEST, IdUtil.getInt(), ActionType.SET_WEBSITE.name()), msgPacket -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("success", true);
+            session.sendMsg(new MsgPacket(map, ContentType.JSON, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+            //更新缓存，可选
+            //session.sendJsonMsg(new HashMap<>(), ActionType.REFRESH_CACHE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST);
+        });
+    }
+
+    public void index() {
+        Map<String, Object> keyMap = new HashMap<>();
+        keyMap.put("key", "host");
+        session.sendJsonMsg(keyMap, ActionType.GET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, msgPacket -> {
+            Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
+            Map<String, Object> data = new HashMap<>();
+            data.put("theme", Objects.equals(requestInfo.getHeader().get("Dark-Mode"), "true") ? "dark" : "light");
+            if (Objects.isNull(map.get("host"))) {
+                map.put("host", "");
+            }
+            data.put("data", new Gson().toJson(map));
+            session.responseHtml("/templates/index.html", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
+        });
+    }
+
+    public void widget() {
+        Map<String, Object> keyMap = new HashMap<>();
+        keyMap.put("key", "host");
+        session.sendJsonMsg(keyMap, ActionType.GET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, msgPacket -> {
+            Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
+            if (Objects.isNull(map.get("host"))) {
+                map.put("host", "");
+            }
+            session.responseHtml("/templates/widget.html", map, requestPacket.getMethodStr(), requestPacket.getMsgId());
+        });
+    }
+
+    public void img() {
+        session.sendMsg(new MsgPacket("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", ContentType.BYTE, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+    }
+}
