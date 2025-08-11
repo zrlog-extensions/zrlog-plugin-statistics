@@ -64,6 +64,6 @@ public class StatisticsController {
     }
 
     public void img() {
-        session.sendMsg(new MsgPacket("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", ContentType.BYTE, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
+        session.sendMsg(new MsgPacket("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==".getBytes(), ContentType.BYTE, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
     }
 }
