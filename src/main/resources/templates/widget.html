@@ -1,5 +1,5 @@
 <script>
-    window.onload = function () {
+    (function () {
         var img = new Image();
         var params = [];
         params.push("path=" + encodeURIComponent(window.location.pathname))
@@ -9,5 +9,5 @@
         params.push("windowWidth=" + window.innerWidth);
         params.push("devicePixelRatio=" + window.devicePixelRatio);
         img.src = "${host}/p/statistics/img?" + params.join("&");
-    }
+    })()
 </script>
