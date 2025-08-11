@@ -1,7 +1,12 @@
 <script>
     window.onload = function () {
-        console.info(window.location.href);
         var img = new Image();
-        img.src = '${host}/p/statistics/img?path=' + encodeURIComponent(window.location.pathname) + "&timestamp=" + new Date().getTime();
+        var params = [];
+        params.push("path=" + encodeURIComponent(window.location.pathname))
+        params.push("timestamp=" + new Date().getTime());
+        params.push("screenWidth=" + screen.width)
+        params.push("screenHeight=" + screen.height);
+        params.push("windowWidth=" + window.innerWidth);
+        img.src = "${host}/p/statistics/img?" + params.join("&");
     }
 </script>
