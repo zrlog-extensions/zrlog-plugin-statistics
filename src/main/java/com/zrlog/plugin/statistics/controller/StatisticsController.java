@@ -28,6 +28,9 @@ public class StatisticsController {
     private final IOSession session;
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
+    private static final String SVG_STR = "\"<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" width=\\\"1\\\" height=\\\"1\\\">\\n\" +\n" +
+            "                    \"  <rect width=\\\"1\\\" height=\\\"1\\\" fill=\\\"transparent\\\"/>\\n\" +\n" +
+            "                    \"</svg>";
 
     public StatisticsController(IOSession session, MsgPacket requestPacket, HttpRequestInfo requestInfo) {
         this.session = session;
@@ -73,12 +76,13 @@ public class StatisticsController {
     }
 
     public void img() {
-        session.sendMsg(new MsgPacket("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
-                "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
-                "</svg>", ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
         Map<String, Object> keyMap = new HashMap<>();
         String[] path = requestInfo.getParam().get("path");
         if (path == null || path.length == 0) {
+            if (RunConstants.runType == RunType.DEV) {
+                LOGGER.warning("Request missing path");
+            }
+            session.responseHtmlStr(SVG_STR, requestPacket.getMethodStr(), requestPacket.getMsgId());
             return;
         }
         String aliasKey = URLDecoder.decode(path[0], Charset.defaultCharset()).replace("/", "").replace(".html", "");
@@ -86,6 +90,7 @@ public class StatisticsController {
         session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
             @Override
             public void handler(MsgPacket responseMsgPacket) {
+                session.sendMsg(new MsgPacket(SVG_STR, ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
                 if (RunConstants.runType == RunType.DEV) {
                     LOGGER.info("Report " + aliasKey + " success.");
                 }
