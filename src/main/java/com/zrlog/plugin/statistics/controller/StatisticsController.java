@@ -59,7 +59,7 @@ public class StatisticsController {
                 map.put("host", "");
             }
             data.put("data", new Gson().toJson(map));
-            session.responseHtml("/templates/index.html", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
+            session.responseHtml("/templates/index", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
         });
     }
 
@@ -73,7 +73,7 @@ public class StatisticsController {
             } else {
                 map.put("host", "//" + map.get("host"));
             }
-            session.responseHtml("/templates/widget.html", map, requestPacket.getMethodStr(), requestPacket.getMsgId());
+            session.responseHtml("/templates/widget", map, requestPacket.getMethodStr(), requestPacket.getMsgId());
         });
     }
 

@@ -6,7 +6,7 @@
 
     <groupId>com.zrlog</groupId>
     <artifactId>plugin-statistics</artifactId>
-    <version>3.2.13</version>
+    <version>3.2.14</version>
 
     <properties>
         <outputDirectory>/home/xiaochun/zrlog-plugin/</outputDirectory>
@@ -20,7 +20,7 @@
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>zrlog-plugin-common</artifactId>
-            <version>3.2.13</version>
+            <version>3.2.14</version>
         </dependency>
     </dependencies>
 
