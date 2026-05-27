@@ -10,11 +10,12 @@ import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
+import com.zrlog.plugin.statistics.service.StatisticsRepository;
 import com.zrlog.plugin.type.ActionType;
 import com.zrlog.plugin.type.RunType;
 
 import java.net.URLDecoder;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +29,7 @@ public class StatisticsController {
     private final IOSession session;
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
+    private final StatisticsRepository repository = StatisticsRepository.getInstance();
     private static final String SVG_STR = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
             "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
             "</svg>";
@@ -63,6 +65,23 @@ public class StatisticsController {
         });
     }
 
+    public void surface() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", repository.surfaceData(session));
+        response(response);
+    }
+
+    public void surfaceAction() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        Map<String, Object> data = new HashMap<>();
+        data.put("message", "已刷新统计");
+        data.put("surface", repository.surfaceData(session));
+        response.put("data", data);
+        response(response);
+    }
+
     public void widget() {
         Map<String, Object> keyMap = new HashMap<>();
         keyMap.put("key", "host");
@@ -87,8 +106,9 @@ public class StatisticsController {
             session.responseHtmlStr(SVG_STR, requestPacket.getMethodStr(), requestPacket.getMsgId());
             return;
         }
-        String aliasKey = URLDecoder.decode(path[0], Charset.defaultCharset()).replace("/", "").replace(".html", "");
+        String aliasKey = URLDecoder.decode(path[0], StandardCharsets.UTF_8).replace("/", "").replace(".html", "");
         keyMap.put("alias", aliasKey);
+        repository.recordVisit(session, requestInfo, aliasKey);
         session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
             @Override
             public void handler(MsgPacket responseMsgPacket) {
@@ -98,5 +118,9 @@ public class StatisticsController {
                 }
             }
         });
+    }
+
+    private void response(Map<String, Object> map) {
+        session.sendMsg(ContentType.JSON, map, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
     }
 }
