@@ -18,9 +18,8 @@ public class Application {
      * @param args
      */
     public static void main(String[] args) throws IOException {
-        List<Class> classList = new ArrayList<>();
+        List<Class<?>> classList = new ArrayList<>();
         classList.add(StatisticsController.class);
         new NioClient(connectHandler, new SimpleTemplateRender(), new StatisticsClientActionHandler()).connectServer(args, classList, StatisticsPluginAction.class);
     }
 }
-

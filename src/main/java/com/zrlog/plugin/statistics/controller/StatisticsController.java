@@ -4,12 +4,14 @@ import com.google.gson.Gson;
 import com.zrlog.plugin.IMsgPacketCallBack;
 import com.zrlog.plugin.IOSession;
 import com.zrlog.plugin.RunConstants;
+import com.zrlog.plugin.common.model.PublicInfo;
 import com.zrlog.plugin.common.IdUtil;
 import com.zrlog.plugin.common.LoggerUtil;
 import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
+import com.zrlog.plugin.statistics.model.StatisticsConfig;
 import com.zrlog.plugin.statistics.service.StatisticsRepository;
 import com.zrlog.plugin.type.ActionType;
 import com.zrlog.plugin.type.RunType;
@@ -30,6 +32,7 @@ public class StatisticsController {
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
     private final StatisticsRepository repository = StatisticsRepository.getInstance();
+    private final Gson gson = new Gson();
     private static final String SVG_STR = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
             "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
             "</svg>";
@@ -41,28 +44,24 @@ public class StatisticsController {
     }
 
     public void update() {
-        session.sendMsg(new MsgPacket(requestInfo.simpleParam(), ContentType.JSON, MsgPacketStatus.SEND_REQUEST, IdUtil.getInt(), ActionType.SET_WEBSITE.name()), msgPacket -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("success", true);
-            session.sendMsg(new MsgPacket(map, ContentType.JSON, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
-            //更新缓存，可选
-            //session.sendJsonMsg(new HashMap<>(), ActionType.REFRESH_CACHE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST);
-        });
+        StatisticsConfig config = repository.saveConfig(session, params());
+        response(successMap(config));
     }
 
     public void index() {
-        Map<String, Object> keyMap = new HashMap<>();
-        keyMap.put("key", "host");
-        session.sendJsonMsg(keyMap, ActionType.GET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, msgPacket -> {
-            Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
-            Map<String, Object> data = new HashMap<>();
-            data.put("theme", Objects.equals(requestInfo.getHeader().get("Dark-Mode"), "true") ? "dark" : "light");
-            if (Objects.isNull(map.get("host"))) {
-                map.put("host", "");
-            }
-            data.put("data", new Gson().toJson(map));
-            session.responseHtml("/templates/index", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
-        });
+        Map<String, Object> data = new HashMap<>();
+        data.put("theme", isDarkMode() ? "dark" : "light");
+        data.put("data", gson.toJson(pageData()));
+        session.responseHtml("/templates/index", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
+    }
+
+    public void json() {
+        response(pageData());
+    }
+
+    public void list() {
+        StatisticsConfig config = repository.readConfig(session);
+        response(successMap(repository.page(session, params(), config.getRetentionDays())));
     }
 
     public void surface() {
@@ -83,17 +82,10 @@ public class StatisticsController {
     }
 
     public void widget() {
-        Map<String, Object> keyMap = new HashMap<>();
-        keyMap.put("key", "host");
-        session.sendJsonMsg(keyMap, ActionType.GET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, msgPacket -> {
-            Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
-            if (Objects.isNull(map.get("host"))) {
-                map.put("host", "");
-            } else {
-                map.put("host", "//" + map.get("host"));
-            }
-            session.responseHtml("/templates/widget", map, requestPacket.getMethodStr(), requestPacket.getMsgId());
-        });
+        StatisticsConfig config = repository.readConfig(session);
+        Map<String, Object> data = new HashMap<>();
+        data.put("host", widgetHost(config.getHost()));
+        session.responseHtml("/widget", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
     }
 
     public void img() {
@@ -122,5 +114,71 @@ public class StatisticsController {
 
     private void response(Map<String, Object> map) {
         session.sendMsg(ContentType.JSON, map, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+    }
+
+    private Map<String, Object> pageData() {
+        StatisticsConfig config = repository.readConfig(session);
+        Map<String, Object> overview = repository.overview(session, config.getRetentionDays());
+        Map<String, Object> firstPageParams = new HashMap<>();
+        firstPageParams.put("page", "1");
+        firstPageParams.put("pageSize", "10");
+        PublicInfo publicInfo = publicInfo();
+        Map<String, Object> data = new HashMap<>();
+        data.put("dark", publicInfo.getDarkMode() == null ? isDarkMode() : publicInfo.getDarkMode());
+        data.put("colorPrimary", notBlank(publicInfo.getAdminColorPrimary()) ? publicInfo.getAdminColorPrimary() : "#1677ff");
+        data.put("plugin", session.getPlugin());
+        data.put("config", config);
+        data.put("summary", overview.get("summary"));
+        data.put("charts", overview.get("charts"));
+        data.put("logs", repository.page(session, firstPageParams, config.getRetentionDays()));
+        return successMap(data);
+    }
+
+    private PublicInfo publicInfo() {
+        try {
+            PublicInfo publicInfo = session.getResponseSync(ContentType.JSON, new HashMap<>(), ActionType.LOAD_PUBLIC_INFO, PublicInfo.class);
+            return publicInfo == null ? new PublicInfo() : publicInfo;
+        } catch (Exception e) {
+            return new PublicInfo();
+        }
+    }
+
+    private Map<String, Object> params() {
+        if (requestInfo.getRequestBody() != null && requestInfo.getRequestBody().length > 0) {
+            String body = new String(requestInfo.getRequestBody(), StandardCharsets.UTF_8);
+            if (body.trim().startsWith("{")) {
+                return gson.fromJson(body, Map.class);
+            }
+        }
+        if (requestInfo.getParam() == null) {
+            return new HashMap<>();
+        }
+        return requestInfo.simpleParam();
+    }
+
+    private Map<String, Object> successMap(Object data) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("success", true);
+        map.put("data", data);
+        return map;
+    }
+
+    private boolean isDarkMode() {
+        return requestInfo.getHeader() != null && Objects.equals(requestInfo.getHeader().get("Dark-Mode"), "true");
+    }
+
+    private String widgetHost(String host) {
+        if (!notBlank(host)) {
+            return "";
+        }
+        String trimmed = host.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("//")) {
+            return trimmed;
+        }
+        return "//" + trimmed;
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

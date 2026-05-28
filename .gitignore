@@ -6,6 +6,11 @@
 **/target
 **/temp/**
 /build/
+/src/main/frontend/build/
+/src/main/frontend/node_modules/
+/src/main/frontend/tsconfig.tsbuildinfo
+/src/main/resources/templates/
+/src/main/resources/conf.properties
 
 .settings
 .classpath

@@ -1,0 +1,64 @@
+<script>
+    (function () {
+        var visitorCookie = "zrlog_statistics_vid";
+        var sessionCookie = "zrlog_statistics_sid";
+        var lastVisitCookie = "zrlog_statistics_last";
+        var sessionTimeout = 30 * 60 * 1000;
+        var now = new Date().getTime();
+
+        function uuid() {
+            if (window.crypto && window.crypto.randomUUID) {
+                return window.crypto.randomUUID();
+            }
+            return "s-" + now + "-" + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+        }
+
+        function readCookie(name) {
+            var pairs = document.cookie ? document.cookie.split(";") : [];
+            for (var i = 0; i < pairs.length; i++) {
+                var pair = pairs[i].trim();
+                if (pair.indexOf(name + "=") === 0) {
+                    return decodeURIComponent(pair.substring(name.length + 1));
+                }
+            }
+            return "";
+        }
+
+        function writeCookie(name, value, maxAgeSeconds) {
+            var cookie = name + "=" + encodeURIComponent(value) + "; path=/; SameSite=Lax";
+            if (maxAgeSeconds) {
+                cookie += "; max-age=" + maxAgeSeconds;
+            }
+            if (location.protocol === "https:") {
+                cookie += "; Secure";
+            }
+            document.cookie = cookie;
+        }
+
+        var visitorId = readCookie(visitorCookie);
+        if (!visitorId) {
+            visitorId = uuid();
+        }
+        writeCookie(visitorCookie, visitorId, 365 * 24 * 60 * 60);
+
+        var lastVisitAt = parseInt(readCookie(lastVisitCookie), 10) || 0;
+        var sessionId = readCookie(sessionCookie);
+        if (!sessionId || now - lastVisitAt > sessionTimeout) {
+            sessionId = uuid();
+        }
+        writeCookie(sessionCookie, sessionId, 30 * 60);
+        writeCookie(lastVisitCookie, String(now), 365 * 24 * 60 * 60);
+
+        var img = new Image();
+        var params = [];
+        params.push("path=" + encodeURIComponent(window.location.pathname));
+        params.push("visitorId=" + encodeURIComponent(visitorId));
+        params.push("sessionId=" + encodeURIComponent(sessionId));
+        params.push("timestamp=" + new Date().getTime());
+        params.push("screenWidth=" + screen.width);
+        params.push("screenHeight=" + screen.height);
+        params.push("windowWidth=" + window.innerWidth);
+        params.push("devicePixelRatio=" + window.devicePixelRatio);
+        img.src = "${host}/p/statistics/img?" + params.join("&");
+    })();
+</script>
