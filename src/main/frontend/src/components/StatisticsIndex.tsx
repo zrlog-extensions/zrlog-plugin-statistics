@@ -4,11 +4,16 @@ import type {ColumnsType} from "antd/es/table";
 import {
     Alert,
     Button,
+    Card,
+    Col,
     Descriptions,
     Drawer,
     Empty,
+    Flex,
     Form,
+    Grid,
     Input,
+    Row,
     Select,
     Space,
     Statistic,
@@ -169,6 +174,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const [form] = Form.useForm<StatisticsConfig>();
     const [messageApi, contextHolder] = message.useMessage();
     const {token} = theme.useToken();
+    const screens = Grid.useBreakpoint();
 
     const embedCode = '<plugin name="statistics" view="widget"/>';
 
@@ -260,10 +266,10 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             dataIndex: "deviceType",
             width: 168,
             render: (_: string, row) => (
-                <div className="device-cell">
+                <Flex align="center" gap={6} style={{ whiteSpace: "nowrap" }}>
                     <Tag color={row.deviceType === "移动端" ? "blue" : undefined}>{row.deviceType}</Tag>
                     <Typography.Text type="secondary">{row.windowWidth ? `${row.windowWidth}px` : "未知"}</Typography.Text>
-                </div>
+                </Flex>
             ),
         },
         {
@@ -297,31 +303,71 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     );
 
     return (
-        <div className="statistics-shell">
+        <div
+            style={{
+                width: "100%",
+                maxWidth: 1240,
+                margin: "0 auto",
+                padding: screens.xs ? 14 : 20,
+                boxSizing: "border-box",
+            }}
+        >
             {contextHolder}
-            <div className="statistics-topbar">
+            <Flex
+                justify="space-between"
+                align="flex-start"
+                gap={16}
+                vertical={screens.xs}
+                style={{ marginBottom: 18 }}
+            >
                 <div>
-                    <h1 className="statistics-title">访问统计</h1>
-                    <div className="statistics-subtitle">最近 {config.retentionDays || 30} 天访问明细和趋势</div>
+                    <Typography.Title level={2} style={{ margin: 0, fontSize: 24, lineHeight: "32px", fontWeight: 650 }}>
+                        访问统计
+                    </Typography.Title>
+                    <Typography.Text type="secondary" style={{ marginTop: 6, display: "block", fontSize: 14 }}>
+                        最近 {config.retentionDays || 30} 天访问明细和趋势
+                    </Typography.Text>
                 </div>
-                <Space wrap>
+                <Space wrap style={{ marginTop: screens.xs ? 12 : 0 }}>
                     <Button icon={<ReloadOutlined/>} onClick={refreshPage} loading={loading}>刷新</Button>
                     <Button icon={<SettingOutlined/>} onClick={openSetting}>设置</Button>
                 </Space>
-            </div>
+            </Flex>
 
-            <div className="summary-grid">
+            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
                 {metrics.map(metric => (
-                    <div className="summary-card" key={metric.label}>
-                        <Statistic title={metric.label} value={metric.value}/>
-                        <Tag className="summary-tag" color={statusColor(metric.status)}>{metric.status === "processing" ? "今日有访问" : "统计中"}</Tag>
-                    </div>
+                    <Col xs={24} sm={12} md={6} key={metric.label}>
+                        <Card
+                            bordered
+                            style={{
+                                position: "relative",
+                                minHeight: 92,
+                                borderColor: token.colorBorderSecondary,
+                                borderRadius: token.borderRadiusLG,
+                                backgroundColor: token.colorBgContainer,
+                            }}
+                            bodyStyle={{ padding: 16 }}
+                        >
+                            <Statistic title={metric.label} value={metric.value}/>
+                            <Tag
+                                color={statusColor(metric.status)}
+                                style={{
+                                    position: "absolute",
+                                    top: 14,
+                                    right: 12,
+                                    marginRight: 0,
+                                }}
+                            >
+                                {metric.status === "processing" ? "今日有访问" : "统计中"}
+                            </Tag>
+                        </Card>
+                    </Col>
                 ))}
-            </div>
+            </Row>
 
             {logs.total === 0 && (
                 <Alert
-                    className="empty-guide"
+                    style={{ marginBottom: 16 }}
                     type="info"
                     showIcon
                     message="还没有统计数据"
@@ -330,18 +376,51 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 />
             )}
 
-            <div className="chart-grid">
+            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
                 {charts.map(chart => (
-                    <section className={`chart-panel chart-${chart.type}`} key={chart.title}>
-                        <div className="panel-title">{chart.title}</div>
-                        <ChartBlock chart={chart} colorPrimary={data.colorPrimary || token.colorPrimary}/>
-                    </section>
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={chart.type === "line" ? 24 : 12}
+                        key={chart.title}
+                    >
+                        <Card
+                            bordered
+                            style={{
+                                minWidth: 0,
+                                height: "100%",
+                                borderColor: token.colorBorderSecondary,
+                                borderRadius: token.borderRadiusLG,
+                                backgroundColor: token.colorBgContainer,
+                            }}
+                            bodyStyle={{ padding: 16 }}
+                        >
+                            <div style={{ marginBottom: 12, fontSize: 15, fontWeight: 600, color: token.colorTextHeading }}>
+                                {chart.title}
+                            </div>
+                            <ChartBlock chart={chart} colorPrimary={data.colorPrimary || token.colorPrimary}/>
+                        </Card>
+                    </Col>
                 ))}
-            </div>
+            </Row>
 
-            <section className="log-panel">
-                <div className="log-toolbar">
-                    <Space wrap>
+            <Card
+                bordered
+                style={{
+                    borderColor: token.colorBorderSecondary,
+                    borderRadius: token.borderRadiusLG,
+                    backgroundColor: token.colorBgContainer,
+                }}
+                bodyStyle={{ padding: 16 }}
+            >
+                <Flex
+                    justify="space-between"
+                    align="center"
+                    gap={12}
+                    vertical={screens.xs}
+                    style={{ marginBottom: 14 }}
+                >
+                    <Space wrap style={{ marginTop: screens.xs ? 12 : 0 }}>
                         <Input.Search
                             allowClear
                             placeholder="搜索路径、来源、IP"
@@ -374,7 +453,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                         />
                     </Space>
                     <Typography.Text type="secondary">共 {logs.total} 条</Typography.Text>
-                </div>
+                </Flex>
                 <Table
                     rowKey="id"
                     size="middle"
@@ -391,7 +470,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                     }}
                     onChange={pagination => loadLogs(pagination.current || 1, pagination.pageSize || 10)}
                 />
-            </section>
+            </Card>
 
             <Drawer
                 title="统计设置"
@@ -408,11 +487,13 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                         <Select options={retentionOptions}/>
                     </Form.Item>
                 </Form>
-                <div className="setting-block">
-                    <div className="setting-label">插件代码</div>
+                <div style={{ marginTop: 22 }}>
+                    <Typography.Text style={{ marginBottom: 8, display: "block", fontSize: 14, fontWeight: 600 }}>
+                        插件代码
+                    </Typography.Text>
                     <Input.TextArea readOnly value={embedCode} rows={2}/>
                     <Button
-                        className="copy-button"
+                        style={{ marginTop: 8 }}
                         icon={<CopyOutlined/>}
                         onClick={() => {
                             navigator.clipboard?.writeText(embedCode);
@@ -422,9 +503,20 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                         复制
                     </Button>
                 </div>
-                <div className="setting-block">
-                    <div className="setting-label">预览</div>
-                    <iframe title="statistics-widget" src="/p/statistics/widget?preview=true" className="widget-preview"/>
+                <div style={{ marginTop: 22 }}>
+                    <Typography.Text style={{ marginBottom: 8, display: "block", fontSize: 14, fontWeight: 600 }}>
+                        预览
+                    </Typography.Text>
+                    <iframe
+                        title="statistics-widget"
+                        src="/p/statistics/widget?preview=true"
+                        style={{
+                            width: "100%",
+                            height: 56,
+                            border: `1px solid ${token.colorBorderSecondary}`,
+                            borderRadius: token.borderRadiusLG,
+                        }}
+                    />
                 </div>
             </Drawer>
 
