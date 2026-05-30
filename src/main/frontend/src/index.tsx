@@ -71,6 +71,23 @@ export interface StatisticsLogRow {
     os: string;
 }
 
+export interface StatisticsDailySiteData {
+    date: string;
+    pv: number;
+    uv: number;
+    sessions: number;
+    uniqueIp: number;
+    articleCount: number;
+    topArticle: string;
+    topArticleViews: number;
+    topSource: string;
+    topSourceViews: number;
+    mobile: number;
+    tablet: number;
+    desktop: number;
+    unknownDevice: number;
+}
+
 export interface PageData<T> {
     rows: T[];
     total: number;
@@ -85,6 +102,7 @@ export interface StatisticsInfoResponse {
     config: StatisticsConfig;
     summary: StatisticsMetric[];
     charts: StatisticsChart[];
+    dailySiteData: StatisticsDailySiteData[];
     logs: PageData<StatisticsLogRow>;
 }
 

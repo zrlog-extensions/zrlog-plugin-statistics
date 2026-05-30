@@ -128,6 +128,7 @@ public class StatisticsController {
         data.put("config", config);
         data.put("summary", overview.get("summary"));
         data.put("charts", overview.get("charts"));
+        data.put("dailySiteData", overview.get("dailySiteData"));
         data.put("logs", repository.page(session, firstPageParams, config.getRetentionDays()));
         return successMap(data);
     }

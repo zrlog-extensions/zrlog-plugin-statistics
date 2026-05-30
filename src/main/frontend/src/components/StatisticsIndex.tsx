@@ -31,6 +31,7 @@ import {
     StandardResponse,
     StatisticsChart,
     StatisticsConfig,
+    StatisticsDailySiteData,
     StatisticsInfoResponse,
     StatisticsLogRow,
     StatisticsMetric,
@@ -116,6 +117,13 @@ const shortId = (value: string) => {
     return value.slice(0, 8);
 };
 
+const topLabel = (name: string, value: number) => {
+    if (!name) {
+        return "-";
+    }
+    return value > 0 ? `${name} (${value})` : name;
+};
+
 const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: string }> = ({chart, colorPrimary}) => {
     if (chart.data.length === 0) {
         return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据"/>;
@@ -166,6 +174,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const [config, setConfig] = useState<StatisticsConfig>(data.config);
     const [metrics, setMetrics] = useState<StatisticsMetric[]>(data.summary || []);
     const [charts, setCharts] = useState<StatisticsChart[]>(data.charts || []);
+    const [dailySiteData, setDailySiteData] = useState<StatisticsDailySiteData[]>(data.dailySiteData || []);
     const [logs, setLogs] = useState<PageData<StatisticsLogRow>>(data.logs);
     const [filters, setFilters] = useState<FilterValues>({});
     const [loading, setLoading] = useState(false);
@@ -205,6 +214,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             setConfig(response.data.config);
             setMetrics(response.data.summary || []);
             setCharts(response.data.charts || []);
+            setDailySiteData(response.data.dailySiteData || []);
             setLogs(response.data.logs);
         } catch (e) {
             messageApi.error(e instanceof Error ? e.message : "加载失败");
@@ -233,6 +243,74 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             messageApi.error(e instanceof Error ? e.message : "保存失败");
         }
     };
+
+    const dailyColumns = useMemo<ColumnsType<StatisticsDailySiteData>>(() => [
+        {
+            title: "日期",
+            dataIndex: "date",
+            width: 116,
+            fixed: screens.xs ? undefined : ("left" as const),
+        },
+        {
+            title: "PV",
+            dataIndex: "pv",
+            width: 78,
+            align: "right",
+        },
+        {
+            title: "UV",
+            dataIndex: "uv",
+            width: 78,
+            align: "right",
+        },
+        {
+            title: "Session",
+            dataIndex: "sessions",
+            width: 96,
+            align: "right",
+        },
+        {
+            title: "IP",
+            dataIndex: "uniqueIp",
+            width: 76,
+            align: "right",
+        },
+        {
+            title: "文章数",
+            dataIndex: "articleCount",
+            width: 88,
+            align: "right",
+        },
+        {
+            title: "热门文章",
+            key: "topArticle",
+            width: 190,
+            render: (_, row) => (
+                <Tooltip title={topLabel(row.topArticle, row.topArticleViews)}>
+                    <Typography.Text ellipsis>{topLabel(row.topArticle, row.topArticleViews)}</Typography.Text>
+                </Tooltip>
+            ),
+        },
+        {
+            title: "主要来源",
+            key: "topSource",
+            width: 128,
+            render: (_, row) => topLabel(row.topSource, row.topSourceViews),
+        },
+        {
+            title: "设备",
+            key: "device",
+            width: 260,
+            render: (_, row) => (
+                <Space size={[4, 4]} wrap>
+                    <Tag color="blue">移动 {row.mobile}</Tag>
+                    <Tag>平板 {row.tablet}</Tag>
+                    <Tag color="green">桌面 {row.desktop}</Tag>
+                    <Tag>未知 {row.unknownDevice}</Tag>
+                </Space>
+            ),
+        },
+    ], [screens.xs]);
 
     const columns = useMemo<ColumnsType<StatisticsLogRow>>(() => [
         {
@@ -403,6 +481,45 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                     </Col>
                 ))}
             </Row>
+
+            <Card
+                bordered
+                style={{
+                    marginBottom: 16,
+                    borderColor: token.colorBorderSecondary,
+                    borderRadius: token.borderRadiusLG,
+                    backgroundColor: token.colorBgContainer,
+                }}
+                bodyStyle={{ padding: 16 }}
+            >
+                <Flex
+                    justify="space-between"
+                    align="center"
+                    gap={12}
+                    vertical={screens.xs}
+                    style={{ marginBottom: 14 }}
+                >
+                    <div>
+                        <Typography.Text style={{ display: "block", fontSize: 15, fontWeight: 600, color: token.colorTextHeading }}>
+                            每日站点数据
+                        </Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                            按天汇总 PV、UV、Session、IP、文章和设备
+                        </Typography.Text>
+                    </div>
+                    <Typography.Text type="secondary">共 {dailySiteData.length} 天</Typography.Text>
+                </Flex>
+                <Table
+                    rowKey="date"
+                    size="middle"
+                    loading={loading}
+                    columns={dailyColumns}
+                    dataSource={dailySiteData}
+                    scroll={{x: 1120}}
+                    locale={{emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无每日站点数据"/>}}
+                    pagination={dailySiteData.length > 10 ? {pageSize: 10, showSizeChanger: false} : false}
+                />
+            </Card>
 
             <Card
                 bordered

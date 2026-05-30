@@ -5,6 +5,7 @@ import com.zrlog.plugin.client.NioClient;
 import com.zrlog.plugin.render.SimpleTemplateRender;
 import com.zrlog.plugin.statistics.controller.StatisticsController;
 import com.zrlog.plugin.statistics.handle.ConnectHandler;
+import com.zrlog.plugin.statistics.service.StatisticsDailyReportService;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ public class Application {
     public static void main(String[] args) throws IOException {
         List<Class<?>> classList = new ArrayList<>();
         classList.add(StatisticsController.class);
-        new NioClient(connectHandler, new SimpleTemplateRender(), new StatisticsClientActionHandler()).connectServer(args, classList, StatisticsPluginAction.class);
+        new NioClient(connectHandler, new SimpleTemplateRender(), new StatisticsClientActionHandler())
+                .connectServer(args, classList, StatisticsPluginAction.class, StatisticsDailyReportService.class);
     }
 }

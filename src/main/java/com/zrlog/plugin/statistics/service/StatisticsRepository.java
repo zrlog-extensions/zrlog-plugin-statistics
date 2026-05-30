@@ -3,12 +3,13 @@ package com.zrlog.plugin.statistics.service;
 import com.google.gson.Gson;
 import com.zrlog.plugin.IOSession;
 import com.zrlog.plugin.common.LoggerUtil;
-import com.zrlog.plugin.data.codec.ContentType;
+import com.zrlog.plugin.common.SessionKvRepository;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.statistics.model.StatisticsConfig;
+import com.zrlog.plugin.statistics.model.StatisticsDailySiteData;
+import com.zrlog.plugin.statistics.model.StatisticsDailySiteDataStore;
 import com.zrlog.plugin.statistics.model.StatisticsLogEntry;
 import com.zrlog.plugin.statistics.model.StatisticsLogStore;
-import com.zrlog.plugin.type.ActionType;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -35,8 +36,10 @@ public class StatisticsRepository {
     private static final Logger LOGGER = LoggerUtil.getLogger(StatisticsRepository.class);
     private static final StatisticsRepository INSTANCE = new StatisticsRepository();
     private static final String STORE_KEY = "statisticsLogs";
+    private static final String DAILY_SITE_DATA_KEY = StatisticsDailySiteDataStore.SCHEMA;
     private static final String CONFIG_HOST_KEY = "host";
     private static final String CONFIG_RETENTION_DAYS_KEY = "statisticsRetentionDays";
+    private static final String CONFIG_KEYS = CONFIG_HOST_KEY + "," + CONFIG_RETENTION_DAYS_KEY;
     private static final String VISITOR_COOKIE = "zrlog_statistics_vid";
     private static final String SESSION_COOKIE = "zrlog_statistics_sid";
     private static final int DEFAULT_RETENTION_DAYS = 30;
@@ -101,27 +104,26 @@ public class StatisticsRepository {
             daySessions.get(dayKey).add(sessionId);
         }
 
+        List<StatisticsDailySiteData> dailySiteData = dailySiteData(session, config.getRetentionDays());
+        StatisticsDailySiteData todayData = dailySiteData.isEmpty() ? emptyDaily(DAY_FORMATTER.format(today)) : dailySiteData.get(0);
         Map<String, Object> surface = new LinkedHashMap<>();
         surface.put("version", "1.0");
         surface.put("title", "访问统计");
-        surface.put("description", "最近 " + config.getRetentionDays() + " 天记录 " + logs.size() + " 次访问");
+        surface.put("description", "今日 PV " + todayData.getPv() + " / UV " + todayData.getUv()
+                + "，最近 " + config.getRetentionDays() + " 天记录 " + logs.size() + " 次访问");
         surface.put("status", logs.isEmpty() ? "normal" : "processing");
         surface.put("view", viewMap("进入插件", "index", "index"));
         surface.put("metrics", metrics(config.getRetentionDays(), logs.size(), visitors.size(), sessions.size(), ips.size(), aliasCounts.size()));
         surface.put("charts", charts(config.getRetentionDays(), today, dayCounts, dayVisitors, daySessions, aliasCounts, sourceCounts, deviceCounts, viewportCounts));
-        surface.put("items", recentItems(logs));
+        surface.put("items", dailyItems(dailySiteData));
         return surface;
     }
 
     public synchronized StatisticsConfig readConfig(IOSession session) {
-        Map<String, String> request = new HashMap<>();
-        request.put("key", CONFIG_HOST_KEY + "," + CONFIG_RETENTION_DAYS_KEY);
-        Map responseMap = session.getResponseSync(ContentType.JSON, request, ActionType.GET_WEBSITE, Map.class);
+        Map<String, Object> responseMap = SessionKvRepository.of(session).read(CONFIG_KEYS);
         StatisticsConfig config = new StatisticsConfig();
-        if (responseMap != null) {
-            config.setHost(stringValue(responseMap.get(CONFIG_HOST_KEY)));
-            config.setRetentionDays(normalizeRetentionDays(stringValue(responseMap.get(CONFIG_RETENTION_DAYS_KEY))));
-        }
+        config.setHost(stringValue(responseMap.get(CONFIG_HOST_KEY)));
+        config.setRetentionDays(normalizeRetentionDays(stringValue(responseMap.get(CONFIG_RETENTION_DAYS_KEY))));
         return config;
     }
 
@@ -136,8 +138,25 @@ public class StatisticsRepository {
         Map<String, String> request = new HashMap<>();
         request.put(CONFIG_HOST_KEY, config.getHost());
         request.put(CONFIG_RETENTION_DAYS_KEY, String.valueOf(config.getRetentionDays()));
-        session.getResponseSync(ContentType.JSON, request, ActionType.SET_WEBSITE, Map.class);
+        SessionKvRepository.of(session).write(request);
         return config;
+    }
+
+    public synchronized StatisticsDailySiteDataStore refreshDailySiteData(IOSession session) {
+        StatisticsConfig config = readConfig(session);
+        List<StatisticsLogEntry> logs = listRecentLogs(session, config.getRetentionDays());
+        List<StatisticsDailySiteData> liveRows = dailySiteDataFromLogs(logs, config.getRetentionDays());
+        StatisticsDailySiteDataStore store = new StatisticsDailySiteDataStore();
+        store.setUpdatedAt(Instant.now().toString());
+        store.setItems(mergeDailySiteData(readDailySiteDataStore(session).getItems(), liveRows, config.getRetentionDays()));
+        SessionKvRepository.of(session).put(DAILY_SITE_DATA_KEY, gson.toJson(store));
+        return store;
+    }
+
+    public synchronized List<StatisticsDailySiteData> dailySiteData(IOSession session, int retentionDays) {
+        List<StatisticsLogEntry> logs = listRecentLogs(session, retentionDays);
+        List<StatisticsDailySiteData> liveRows = dailySiteDataFromLogs(logs, retentionDays);
+        return mergeDailySiteData(readDailySiteDataStore(session).getItems(), liveRows, retentionDays);
     }
 
     public synchronized Map<String, Object> overview(IOSession session, int retentionDays) {
@@ -181,6 +200,7 @@ public class StatisticsRepository {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("summary", metrics(retentionDays, logs.size(), visitors.size(), sessions.size(), ips.size(), aliasCounts.size()));
         data.put("charts", charts(retentionDays, today, dayCounts, dayVisitors, daySessions, aliasCounts, sourceCounts, deviceCounts, viewportCounts));
+        data.put("dailySiteData", dailySiteData(session, retentionDays));
         return data;
     }
 
@@ -267,6 +287,129 @@ public class StatisticsRepository {
         return daySets;
     }
 
+    private List<StatisticsDailySiteData> dailySiteDataFromLogs(List<StatisticsLogEntry> logs, int retentionDays) {
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate earliest = today.minusDays(retentionDays - 1L);
+        Map<String, DailyAccumulator> accumulatorMap = new LinkedHashMap<>();
+        for (StatisticsLogEntry log : logs) {
+            LocalDate day = toDay(log.getTimestamp());
+            if (day == null || day.isBefore(earliest) || day.isAfter(today)) {
+                continue;
+            }
+            String date = DAY_FORMATTER.format(day);
+            DailyAccumulator accumulator = accumulatorMap.computeIfAbsent(date, DailyAccumulator::new);
+            accumulator.pv++;
+            if (notBlank(log.getIp())) {
+                accumulator.ips.add(log.getIp());
+            }
+            accumulator.visitors.add(defaultVisitorId(log));
+            accumulator.sessions.add(defaultSessionId(log));
+            increase(accumulator.articleCounts, defaultText(log.getAlias(), "未知文章"));
+            increase(accumulator.sourceCounts, sourceName(log.getReferer()));
+            String device = deviceType(log.getWindowWidth(), log.getUserAgent());
+            if ("移动端".equals(device)) {
+                accumulator.mobile++;
+            } else if ("平板 / 中等屏".equals(device)) {
+                accumulator.tablet++;
+            } else if ("桌面端".equals(device)) {
+                accumulator.desktop++;
+            } else {
+                accumulator.unknownDevice++;
+            }
+        }
+        List<StatisticsDailySiteData> rows = new ArrayList<>();
+        for (DailyAccumulator accumulator : accumulatorMap.values()) {
+            rows.add(toDailySiteData(accumulator));
+        }
+        rows.sort((left, right) -> right.getDate().compareTo(left.getDate()));
+        return rows;
+    }
+
+    private List<StatisticsDailySiteData> mergeDailySiteData(List<StatisticsDailySiteData> storedRows,
+                                                            List<StatisticsDailySiteData> liveRows,
+                                                            int retentionDays) {
+        Map<String, StatisticsDailySiteData> rowMap = new HashMap<>();
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate earliest = today.minusDays(retentionDays - 1L);
+        for (StatisticsDailySiteData row : storedRows) {
+            LocalDate day = parseDay(row.getDate());
+            if (day != null && !day.isBefore(earliest) && !day.isAfter(today)) {
+                rowMap.put(row.getDate(), row);
+            }
+        }
+        for (StatisticsDailySiteData row : liveRows) {
+            LocalDate day = parseDay(row.getDate());
+            if (day != null && !day.isBefore(earliest) && !day.isAfter(today)) {
+                rowMap.put(row.getDate(), row);
+            }
+        }
+        List<StatisticsDailySiteData> rows = new ArrayList<>();
+        for (int i = 0; i < retentionDays; i++) {
+            String date = DAY_FORMATTER.format(today.minusDays(i));
+            rows.add(rowMap.getOrDefault(date, emptyDaily(date)));
+        }
+        return rows;
+    }
+
+    private StatisticsDailySiteData toDailySiteData(DailyAccumulator accumulator) {
+        StatisticsDailySiteData row = new StatisticsDailySiteData();
+        row.setDate(accumulator.date);
+        row.setPv(accumulator.pv);
+        row.setUv(accumulator.visitors.size());
+        row.setSessions(accumulator.sessions.size());
+        row.setUniqueIp(accumulator.ips.size());
+        row.setArticleCount(accumulator.articleCounts.size());
+        Map.Entry<String, Integer> topArticle = topEntry(accumulator.articleCounts);
+        if (topArticle != null) {
+            row.setTopArticle(topArticle.getKey());
+            row.setTopArticleViews(topArticle.getValue());
+        }
+        Map.Entry<String, Integer> topSource = topEntry(accumulator.sourceCounts);
+        if (topSource != null) {
+            row.setTopSource(topSource.getKey());
+            row.setTopSourceViews(topSource.getValue());
+        }
+        row.setMobile(accumulator.mobile);
+        row.setTablet(accumulator.tablet);
+        row.setDesktop(accumulator.desktop);
+        row.setUnknownDevice(accumulator.unknownDevice);
+        return row;
+    }
+
+    private StatisticsDailySiteData emptyDaily(String date) {
+        StatisticsDailySiteData row = new StatisticsDailySiteData();
+        row.setDate(date);
+        row.setTopArticle("");
+        row.setTopSource("");
+        return row;
+    }
+
+    private List<Map<String, Object>> dailyItems(List<StatisticsDailySiteData> dailySiteData) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int i = 0; i < dailySiteData.size() && i < 5; i++) {
+            StatisticsDailySiteData row = dailySiteData.get(i);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.getDate());
+            item.put("title", row.getDate() + " 站点数据");
+            item.put("description", "PV " + row.getPv() + " / UV " + row.getUv() + " / Session " + row.getSessions());
+            item.put("status", row.getPv() > 0 ? "processing" : "normal");
+            items.add(item);
+        }
+        return items;
+    }
+
+    private Map.Entry<String, Integer> topEntry(Map<String, Integer> counts) {
+        List<Map.Entry<String, Integer>> entries = topEntries(counts, 1);
+        if (entries.isEmpty()) {
+            return null;
+        }
+        return entries.get(0);
+    }
+
+    private void increase(Map<String, Integer> counts, String key) {
+        counts.put(key, counts.getOrDefault(key, 0) + 1);
+    }
+
     private List<Map<String, Object>> metrics(int retentionDays, int pv, int uv, int sessionCount, int uniqueIp, int articles) {
         List<Map<String, Object>> metrics = new ArrayList<>();
         metrics.add(metricMap(retentionDays + " 天 PV", pv, "normal"));
@@ -330,22 +473,6 @@ public class StatisticsRepository {
         return charts;
     }
 
-    private List<Map<String, Object>> recentItems(List<StatisticsLogEntry> logs) {
-        List<Map<String, Object>> items = new ArrayList<>();
-        int count = 0;
-        for (int i = logs.size() - 1; i >= 0 && count < 5; i--) {
-            StatisticsLogEntry log = logs.get(i);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", String.valueOf(log.getTimestamp()) + "-" + count);
-            item.put("title", defaultText(log.getAlias(), "未知文章"));
-            item.put("description", formatTime(log.getTimestamp()) + " / " + sourceName(log.getReferer()));
-            item.put("status", "normal");
-            items.add(item);
-            count++;
-        }
-        return items;
-    }
-
     private Map<String, Object> rowMap(StatisticsLogEntry log) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", String.valueOf(log.getTimestamp()) + "-" + defaultText(log.getAlias(), ""));
@@ -407,7 +534,13 @@ public class StatisticsRepository {
 
     private List<Map.Entry<String, Integer>> topEntries(Map<String, Integer> counts, int limit) {
         List<Map.Entry<String, Integer>> entries = new ArrayList<>(counts.entrySet());
-        entries.sort((left, right) -> Integer.compare(right.getValue(), left.getValue()));
+        entries.sort((left, right) -> {
+            int valueCompare = Integer.compare(right.getValue(), left.getValue());
+            if (valueCompare != 0) {
+                return valueCompare;
+            }
+            return left.getKey().compareTo(right.getKey());
+        });
         if (entries.size() <= limit) {
             return entries;
         }
@@ -431,6 +564,23 @@ public class StatisticsRepository {
         }
     }
 
+    private StatisticsDailySiteDataStore readDailySiteDataStore(IOSession session) {
+        try {
+            String json = readWebsiteValue(session, DAILY_SITE_DATA_KEY);
+            if (!notBlank(json)) {
+                return new StatisticsDailySiteDataStore();
+            }
+            StatisticsDailySiteDataStore store = gson.fromJson(json, StatisticsDailySiteDataStore.class);
+            if (store == null) {
+                store = new StatisticsDailySiteDataStore();
+            }
+            return store;
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "read statistics daily site data store error", e);
+            return new StatisticsDailySiteDataStore();
+        }
+    }
+
     private void writeStore(IOSession session, StatisticsLogStore store) {
         String json = gson.toJson(store);
         while (json.getBytes(StandardCharsets.UTF_8).length > MAX_VALUE_BYTES && !store.getItems().isEmpty()) {
@@ -441,13 +591,7 @@ public class StatisticsRepository {
     }
 
     private String readWebsiteValue(IOSession session, String key) {
-        Map<String, String> request = new HashMap<>();
-        request.put("key", key);
-        Map responseMap = session.getResponseSync(ContentType.JSON, request, ActionType.GET_WEBSITE, Map.class);
-        if (responseMap == null || responseMap.get(key) == null) {
-            return "";
-        }
-        return String.valueOf(responseMap.get(key));
+        return SessionKvRepository.of(session).get(key).orElse("");
     }
 
     private int normalizeRetentionDays(String value) {
@@ -491,9 +635,7 @@ public class StatisticsRepository {
     }
 
     private void writeWebsiteValue(IOSession session, String key, String value) {
-        Map<String, String> request = new HashMap<>();
-        request.put(key, value);
-        session.getResponseSync(ContentType.JSON, request, ActionType.SET_WEBSITE, Map.class);
+        SessionKvRepository.of(session).put(key, value);
     }
 
     private Map<String, Object> metricMap(String label, int value, String status) {
@@ -717,5 +859,23 @@ public class StatisticsRepository {
             return trimmed;
         }
         return trimmed.substring(0, maxLength);
+    }
+
+    private static class DailyAccumulator {
+        private final String date;
+        private int pv;
+        private int mobile;
+        private int tablet;
+        private int desktop;
+        private int unknownDevice;
+        private final Set<String> visitors = new HashSet<>();
+        private final Set<String> sessions = new HashSet<>();
+        private final Set<String> ips = new HashSet<>();
+        private final Map<String, Integer> articleCounts = new HashMap<>();
+        private final Map<String, Integer> sourceCounts = new HashMap<>();
+
+        private DailyAccumulator(String date) {
+            this.date = date;
+        }
     }
 }
