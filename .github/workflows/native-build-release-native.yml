@@ -26,6 +26,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
 
+      - name: Cache node modules admin
+        uses: actions/cache@v3
+        with:
+          path: src/main/frontend/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('src/main/frontend/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Build and upload binary
         run: |
           bash -e bin/package-native-github.sh /tmp/download/plugin
