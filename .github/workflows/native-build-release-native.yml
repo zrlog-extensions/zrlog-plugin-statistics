@@ -7,6 +7,9 @@ jobs:
   build:
     name: plugin relase package ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    concurrency:
+      group: deploy-on-${{ matrix.os }}-native   # 同一个 group 的任务会排队执行
+      cancel-in-progress: true # 取消前一个任务
 
     strategy:
       matrix:
