@@ -1,5 +1,7 @@
 package com.zrlog.plugin.statistics;
 
+import com.zrlog.plugin.RunConstants;
+import com.zrlog.plugin.type.RunType;
 import com.google.gson.Gson;
 import com.zrlog.plugin.statistics.controller.StatisticsController;
 import com.zrlog.plugin.common.PluginNativeImageUtils;
@@ -20,6 +22,7 @@ public class GraalvmAgentApplication {
 
 
     public static void main(String[] args) throws IOException {
+        RunConstants.runType = RunType.AGENT;
         PluginNativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(StatisticsConfig.class,
                 StatisticsDailySiteData.class, StatisticsDailySiteDataStore.class,
                 StatisticsLogEntry.class, StatisticsLogStore.class));

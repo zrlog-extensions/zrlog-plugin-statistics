@@ -21,7 +21,7 @@
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>zrlog-plugin-common</artifactId>
-            <version>4.0.3</version>
+            <version>4.0.5-SNAPSHOT</version>
         </dependency>
     </dependencies>
 
