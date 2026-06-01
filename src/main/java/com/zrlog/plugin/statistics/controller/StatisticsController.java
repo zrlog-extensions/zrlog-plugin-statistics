@@ -11,15 +11,23 @@ import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.statistics.model.StatisticsConfig;
+import com.zrlog.plugin.statistics.model.StatisticsNotificationChannels;
+import com.zrlog.plugin.statistics.service.StatisticsNotificationSettingRepository;
 import com.zrlog.plugin.statistics.service.StatisticsRepository;
 import com.zrlog.plugin.type.ActionType;
 import com.zrlog.plugin.type.RunType;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.logging.Logger;
 
 public class StatisticsController {
@@ -31,6 +39,7 @@ public class StatisticsController {
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
     private final StatisticsRepository repository = StatisticsRepository.getInstance();
+    private final StatisticsNotificationSettingRepository notificationSettingRepository = StatisticsNotificationSettingRepository.getInstance();
     private final Gson gson = new Gson();
     private static final String SVG_STR = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\">\n" +
             "  <rect width=\"1\" height=\"1\" fill=\"transparent\"/>\n" +
@@ -61,6 +70,46 @@ public class StatisticsController {
     public void list() {
         StatisticsConfig config = repository.readConfig(session);
         response(successMap(repository.page(session, params(), config.getRetentionDays())));
+    }
+
+    public void notificationChannels() {
+        try {
+            response(successMap(notificationChannelInfo()));
+        } catch (Exception e) {
+            response(errorMap(e.getMessage()));
+        }
+    }
+
+    public void saveNotificationChannels() {
+        Map<String, Object> params = params();
+        List providers;
+        try {
+            providers = queryNotificationProviders();
+        } catch (Exception e) {
+            response(errorMap(e.getMessage()));
+            return;
+        }
+        Set<String> availableChannels = availableChannels(providers);
+        List<String> dailyChannels = configuredChannels(params.get("dailyChannels"), availableChannels);
+        if (dailyChannels.isEmpty()) {
+            response(errorMap("请选择 plugin-core 中可用的通知渠道"));
+            return;
+        }
+        List<String> failedChannels = configuredChannels(params.get("failedChannels"), availableChannels);
+        if (failedChannels.isEmpty()) {
+            failedChannels = dailyChannels;
+        }
+        StatisticsNotificationChannels channels = new StatisticsNotificationChannels();
+        StatisticsNotificationChannels.StatisticsNotificationChannelData data =
+                new StatisticsNotificationChannels.StatisticsNotificationChannelData();
+        data.setDailyChannels(dailyChannels);
+        data.setFailedChannels(failedChannels);
+        channels.setData(data);
+        notificationSettingRepository.save(session, channels);
+        Map<String, Object> result = new HashMap<>();
+        result.put("settings", notificationSettingRepository.get(session));
+        result.put("providers", providers);
+        response(successMap(result));
     }
 
     public void surface() {
@@ -126,11 +175,74 @@ public class StatisticsController {
         data.put("colorPrimary", requestInfo.getAdminColorPrimary());
         data.put("plugin", session.getPlugin());
         data.put("config", config);
+        data.put("notificationChannels", notificationSettingRepository.get(session));
         data.put("summary", overview.get("summary"));
         data.put("charts", overview.get("charts"));
         data.put("dailySiteData", overview.get("dailySiteData"));
         data.put("logs", repository.page(session, firstPageParams, config.getRetentionDays()));
         return successMap(data);
+    }
+
+    private Map<String, Object> notificationChannelInfo() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("settings", notificationSettingRepository.get(session));
+        data.put("providers", queryNotificationProviders());
+        return data;
+    }
+
+    private List queryNotificationProviders() {
+        int msgId = session.queryNotificationChannels(null);
+        MsgPacket response = session.getResponseMsgPacketByMsgId(msgId, Duration.ofSeconds(15));
+        if (response == null) {
+            throw new IllegalStateException("通知渠道查询超时");
+        }
+        Map result = gson.fromJson(response.getDataStr(), Map.class);
+        if (response.getStatus() != MsgPacketStatus.RESPONSE_SUCCESS
+                || result == null
+                || Boolean.FALSE.equals(result.get("success"))
+                || numberValue(result.get("code")) > 0) {
+            throw new IllegalStateException(stringValue(result == null ? null : result.get("message")));
+        }
+        Object items = result.get("items");
+        if (items instanceof List) {
+            return (List) items;
+        }
+        return new ArrayList();
+    }
+
+    private Set<String> availableChannels(List providers) {
+        Set<String> channels = new LinkedHashSet<>();
+        for (Object item : providers) {
+            if (!(item instanceof Map)) {
+                continue;
+            }
+            String channel = stringValue(((Map) item).get("channel"));
+            if (notBlank(channel)) {
+                channels.add(channel);
+            }
+        }
+        return channels;
+    }
+
+    private List<String> configuredChannels(Object value, Set<String> availableChannels) {
+        List<String> result = new ArrayList<>();
+        for (String channel : channelList(value)) {
+            if (availableChannels.contains(channel) && !result.contains(channel)) {
+                result.add(channel);
+            }
+        }
+        return result;
+    }
+
+    private int numberValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.parseInt(stringValue(value));
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private Map<String, Object> params() {
@@ -153,6 +265,13 @@ public class StatisticsController {
         return map;
     }
 
+    private Map<String, Object> errorMap(String message) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("success", false);
+        map.put("message", notBlank(message) ? message : "操作失败");
+        return map;
+    }
+
     private boolean isDarkMode() {
         return requestInfo.isDarkMode();
     }
@@ -170,5 +289,38 @@ public class StatisticsController {
 
     private boolean notBlank(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String stringValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+        if (value instanceof List && !((List) value).isEmpty()) {
+            return String.valueOf(((List) value).get(0));
+        }
+        return String.valueOf(value);
+    }
+
+    private List<String> channelList(Object value) {
+        if (value instanceof List) {
+            List<String> result = new ArrayList<>();
+            for (Object item : (List) value) {
+                addChannels(result, stringValue(item));
+            }
+            return result;
+        }
+        return Arrays.asList(stringValue(value).split(","));
+    }
+
+    private void addChannels(List<String> result, String text) {
+        if (!notBlank(text)) {
+            return;
+        }
+        String[] values = text.split(",");
+        for (String value : values) {
+            if (notBlank(value)) {
+                result.add(value.trim());
+            }
+        }
     }
 }

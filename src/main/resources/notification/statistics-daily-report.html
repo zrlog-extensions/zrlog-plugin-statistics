@@ -1,0 +1,38 @@
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7">
+    <h2 style="margin:0 0 12px">${date} 访问统计日报</h2>
+    <table style="border-collapse:collapse;min-width:320px">
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">PV</td>
+            <td style="padding:6px 0;font-weight:600">${pv}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">UV</td>
+            <td style="padding:6px 0;font-weight:600">${uv}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">Session</td>
+            <td style="padding:6px 0;font-weight:600">${sessions}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">访客 IP</td>
+            <td style="padding:6px 0;font-weight:600">${uniqueIp}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">访问文章数</td>
+            <td style="padding:6px 0;font-weight:600">${articleCount}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">热门文章</td>
+            <td style="padding:6px 0;font-weight:600">${topArticle}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">主要来源</td>
+            <td style="padding:6px 0;font-weight:600">${topSource}</td>
+        </tr>
+        <tr>
+            <td style="padding:6px 12px 6px 0;color:#666">设备分布</td>
+            <td style="padding:6px 0;font-weight:600">${deviceSummary}</td>
+        </tr>
+    </table>
+    <p style="color:#666;margin-top:12px">更新时间：${updatedAt}</p>
+</div>

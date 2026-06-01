@@ -28,6 +28,33 @@ export interface StatisticsConfig {
     retentionDays: number;
 }
 
+export interface StatisticsNotificationChannels {
+    schema: string;
+    version: number;
+    data: {
+        dailyChannels: string[];
+        failedChannels: string[];
+    };
+}
+
+export interface NotificationProviderRow {
+    channel: string;
+    providerPluginId: string;
+    providerPluginName?: string;
+    providerPluginPreviewImageBase64?: string;
+    capabilityKey: string;
+    capabilityLabel?: string;
+    providerStatus: string;
+    selected: boolean;
+    confirmed: boolean;
+    reviewRequired: boolean;
+}
+
+export interface StatisticsNotificationChannelInfo {
+    settings: StatisticsNotificationChannels;
+    providers: NotificationProviderRow[];
+}
+
 export interface StatisticsMetric {
     label: string;
     value: number;
@@ -100,6 +127,7 @@ export interface StatisticsInfoResponse {
     colorPrimary: string;
     plugin: Plugin;
     config: StatisticsConfig;
+    notificationChannels: StatisticsNotificationChannels;
     summary: StatisticsMetric[];
     charts: StatisticsChart[];
     dailySiteData: StatisticsDailySiteData[];

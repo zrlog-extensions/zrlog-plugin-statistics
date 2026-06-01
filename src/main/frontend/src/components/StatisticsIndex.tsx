@@ -28,6 +28,7 @@ import axios from "axios";
 import {FunctionComponent, useMemo, useState} from "react";
 import {
     PageData,
+    NotificationProviderRow,
     StandardResponse,
     StatisticsChart,
     StatisticsConfig,
@@ -35,6 +36,8 @@ import {
     StatisticsInfoResponse,
     StatisticsLogRow,
     StatisticsMetric,
+    StatisticsNotificationChannelInfo,
+    StatisticsNotificationChannels,
 } from "../index";
 
 type StatisticsIndexProps = {
@@ -46,6 +49,20 @@ type FilterValues = {
     source?: string;
     alias?: string;
 }
+
+type StatisticsSettingFormValues = StatisticsConfig & {
+    dailyChannels?: string[];
+    failedChannels?: string[];
+}
+
+const defaultNotificationChannels = (): StatisticsNotificationChannels => ({
+    schema: "plugin.statistics.notification.channels",
+    version: 1,
+    data: {
+        dailyChannels: ["email"],
+        failedChannels: ["email"],
+    },
+});
 
 const retentionOptions = [
     {label: "30 天", value: 30},
@@ -72,6 +89,14 @@ const request = async <T, >(url: string, params?: Record<string, string>) => {
 
 const fetchLogs = async (params: Record<string, string>) => {
     const {data} = await axios.get<StandardResponse<PageData<StatisticsLogRow>>>("list", {params});
+    if (!data.success) {
+        throw new Error(data.message || "加载失败");
+    }
+    return data.data;
+};
+
+const fetchNotificationChannelInfo = async () => {
+    const {data} = await axios.get<StandardResponse<StatisticsNotificationChannelInfo>>("notificationChannels");
     if (!data.success) {
         throw new Error(data.message || "加载失败");
     }
@@ -172,20 +197,47 @@ const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: stri
 
 const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const [config, setConfig] = useState<StatisticsConfig>(data.config);
+    const [notificationChannels, setNotificationChannels] = useState<StatisticsNotificationChannels>(
+        data.notificationChannels || defaultNotificationChannels()
+    );
+    const [notificationProviders, setNotificationProviders] = useState<NotificationProviderRow[]>([]);
     const [metrics, setMetrics] = useState<StatisticsMetric[]>(data.summary || []);
     const [charts, setCharts] = useState<StatisticsChart[]>(data.charts || []);
     const [dailySiteData, setDailySiteData] = useState<StatisticsDailySiteData[]>(data.dailySiteData || []);
     const [logs, setLogs] = useState<PageData<StatisticsLogRow>>(data.logs);
     const [filters, setFilters] = useState<FilterValues>({});
     const [loading, setLoading] = useState(false);
+    const [channelLoading, setChannelLoading] = useState(false);
     const [settingOpen, setSettingOpen] = useState(false);
     const [detail, setDetail] = useState<StatisticsLogRow | null>(null);
-    const [form] = Form.useForm<StatisticsConfig>();
+    const [form] = Form.useForm<StatisticsSettingFormValues>();
     const [messageApi, contextHolder] = message.useMessage();
     const {token} = theme.useToken();
     const screens = Grid.useBreakpoint();
 
     const embedCode = '<plugin name="statistics" view="widget"/>';
+
+    const channelOptions = useMemo(() => {
+        const rowsByChannel = new Map<string, NotificationProviderRow[]>();
+        notificationProviders.forEach(row => {
+            if (!row.channel) {
+                return;
+            }
+            rowsByChannel.set(row.channel, [...(rowsByChannel.get(row.channel) || []), row]);
+        });
+        return Array.from(rowsByChannel.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([channel, rows]) => {
+            const provider = rows.find(row => row.selected) || rows.find(row => row.confirmed) || rows[0];
+            const providerName = provider?.providerPluginName || provider?.capabilityLabel || "";
+            return {
+                label: providerName ? `${channel} (${providerName})` : channel,
+                value: channel,
+            };
+        });
+    }, [notificationProviders]);
+
+    const availableChannelValues = useMemo(() => new Set(channelOptions.map(option => option.value)), [channelOptions]);
+
+    const filterAvailableChannels = (channels?: string[]) => (channels || []).filter(channel => availableChannelValues.has(channel));
 
     const loadLogs = async (page = logs.page, pageSize = logs.pageSize, nextFilters = filters) => {
         setLoading(true);
@@ -212,6 +264,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 throw new Error(response.message || "加载失败");
             }
             setConfig(response.data.config);
+            setNotificationChannels(response.data.notificationChannels || defaultNotificationChannels());
             setMetrics(response.data.summary || []);
             setCharts(response.data.charts || []);
             setDailySiteData(response.data.dailySiteData || []);
@@ -223,9 +276,34 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
         }
     };
 
+    const loadNotificationChannels = async () => {
+        setChannelLoading(true);
+        try {
+            const info = await fetchNotificationChannelInfo();
+            setNotificationChannels(info.settings || defaultNotificationChannels());
+            setNotificationProviders(info.providers || []);
+            const values = new Set((info.providers || []).map(row => row.channel).filter(Boolean));
+            const dailyChannels = (info.settings?.data?.dailyChannels || []).filter(channel => values.has(channel));
+            const failedChannels = (info.settings?.data?.failedChannels || []).filter(channel => values.has(channel));
+            form.setFieldsValue({
+                dailyChannels,
+                failedChannels: failedChannels.length > 0 ? failedChannels : dailyChannels,
+            });
+        } catch (e) {
+            messageApi.error(e instanceof Error ? e.message : "通知渠道加载失败");
+        } finally {
+            setChannelLoading(false);
+        }
+    };
+
     const openSetting = () => {
-        form.setFieldsValue(config);
+        form.setFieldsValue({
+            ...config,
+            dailyChannels: notificationChannels.data?.dailyChannels || ["email"],
+            failedChannels: notificationChannels.data?.failedChannels || notificationChannels.data?.dailyChannels || ["email"],
+        });
         setSettingOpen(true);
+        loadNotificationChannels();
     };
 
     const saveSetting = async () => {
@@ -235,7 +313,18 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 host: values.host || "",
                 statisticsRetentionDays: String(values.retentionDays || 30),
             });
+            const dailyChannels = filterAvailableChannels(values.dailyChannels);
+            const failedChannels = filterAvailableChannels(values.failedChannels || values.dailyChannels);
+            if (dailyChannels.length === 0) {
+                throw new Error("请选择 plugin-core 中可用的通知渠道");
+            }
+            const savedChannels = await request<StatisticsNotificationChannelInfo>("saveNotificationChannels", {
+                dailyChannels: dailyChannels.join(","),
+                failedChannels: (failedChannels.length > 0 ? failedChannels : dailyChannels).join(","),
+            });
             setConfig(saved);
+            setNotificationChannels(savedChannels.settings || defaultNotificationChannels());
+            setNotificationProviders(savedChannels.providers || notificationProviders);
             await refreshPage();
             messageApi.success("已保存");
             setSettingOpen(false);
@@ -603,7 +692,41 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                     <Form.Item label="统计窗口" name="retentionDays">
                         <Select options={retentionOptions}/>
                     </Form.Item>
+                    <Form.Item label="日报通知渠道" name="dailyChannels" rules={[{required: true, message: "请选择通知渠道"}]}>
+                        <Select
+                            mode="multiple"
+                            loading={channelLoading}
+                            options={channelOptions}
+                            placeholder="选择通知渠道"
+                            notFoundContent={channelLoading ? "加载中" : "暂无可用渠道"}
+                        />
+                    </Form.Item>
+                    <Form.Item label="失败通知渠道" name="failedChannels">
+                        <Select
+                            mode="multiple"
+                            loading={channelLoading}
+                            options={channelOptions}
+                            placeholder="默认使用日报通知渠道"
+                            notFoundContent={channelLoading ? "加载中" : "暂无可用渠道"}
+                        />
+                    </Form.Item>
                 </Form>
+                {notificationProviders.length === 0 && !channelLoading && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 4, marginBottom: 18 }}
+                        message="plugin-core 当前没有可用通知渠道"
+                    />
+                )}
+                <Button
+                    icon={<ReloadOutlined/>}
+                    loading={channelLoading}
+                    onClick={loadNotificationChannels}
+                    style={{ marginBottom: 18 }}
+                >
+                    重新加载通知渠道
+                </Button>
                 <div style={{ marginTop: 22 }}>
                     <Typography.Text style={{ marginBottom: 8, display: "block", fontSize: 14, fontWeight: 600 }}>
                         插件代码
