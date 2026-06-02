@@ -210,6 +210,8 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const [messageApi, contextHolder] = message.useMessage();
     const {token} = theme.useToken();
     const screens = Grid.useBreakpoint();
+    const isPhone = Boolean(screens.xs && !screens.sm);
+    const isCompact = !screens.lg;
 
     const embedCode = '<plugin name="statistics" view="widget"/>';
 
@@ -471,29 +473,29 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 width: "100%",
                 maxWidth: 1240,
                 margin: "0 auto",
-                padding: screens.xs ? 14 : 20,
+                padding: isPhone ? 12 : isCompact ? 16 : 20,
                 boxSizing: "border-box",
             }}
         >
             {contextHolder}
             <Flex
                 justify="space-between"
-                align="flex-start"
+                align={isCompact ? "stretch" : "flex-start"}
                 gap={16}
-                vertical={screens.xs}
+                vertical={isCompact}
                 style={{ marginBottom: 18 }}
             >
                 <div>
-                    <Typography.Title level={2} style={{ margin: 0, fontSize: 24, lineHeight: "32px", fontWeight: 650 }}>
+                    <Typography.Title level={2} style={{ margin: 0, fontSize: isPhone ? 20 : 24, lineHeight: "32px", fontWeight: 650 }}>
                         访问统计
                     </Typography.Title>
                     <Typography.Text type="secondary" style={{ marginTop: 6, display: "block", fontSize: 14 }}>
                         最近 {config.retentionDays || 30} 天访问明细和趋势
                     </Typography.Text>
                 </div>
-                <Space wrap style={{ marginTop: screens.xs ? 12 : 0 }}>
-                    <Button icon={<ReloadOutlined/>} onClick={refreshPage} loading={loading}>刷新</Button>
-                    <Button icon={<SettingOutlined/>} onClick={openSetting}>设置</Button>
+                <Space wrap style={{ width: isPhone ? "100%" : undefined }}>
+                    <Button icon={<ReloadOutlined/>} onClick={refreshPage} loading={loading} style={isPhone ? {flex: 1} : undefined}>刷新</Button>
+                    <Button icon={<SettingOutlined/>} onClick={openSetting} style={isPhone ? {flex: 1} : undefined}>设置</Button>
                 </Space>
             </Flex>
 
@@ -579,9 +581,9 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             >
                 <Flex
                     justify="space-between"
-                    align="center"
+                    align={isCompact ? "stretch" : "center"}
                     gap={12}
-                    vertical={screens.xs}
+                    vertical={isCompact}
                     style={{ marginBottom: 14 }}
                 >
                     <div>
@@ -596,7 +598,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 </Flex>
                 <Table
                     rowKey="date"
-                    size="middle"
+                    size={isPhone ? "small" : "middle"}
                     loading={loading}
                     columns={dailyColumns}
                     dataSource={dailySiteData}
@@ -617,12 +619,12 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             >
                 <Flex
                     justify="space-between"
-                    align="center"
+                    align={isCompact ? "stretch" : "center"}
                     gap={12}
-                    vertical={screens.xs}
+                    vertical={isCompact}
                     style={{ marginBottom: 14 }}
                 >
-                    <Space wrap style={{ marginTop: screens.xs ? 12 : 0 }}>
+                    <Space wrap style={{ width: isPhone ? "100%" : undefined }}>
                         <Input.Search
                             allowClear
                             placeholder="搜索路径、来源、IP"
@@ -631,7 +633,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                                 setFilters(next);
                                 loadLogs(1, logs.pageSize, next);
                             }}
-                            style={{width: 240}}
+                            style={{width: isPhone ? "100%" : 240}}
                         />
                         <Input
                             allowClear
@@ -641,7 +643,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                                 setFilters(next);
                             }}
                             onPressEnter={() => loadLogs(1, logs.pageSize)}
-                            style={{width: 180}}
+                            style={{width: isPhone ? "100%" : 180}}
                         />
                         <Select
                             value={filters.source || ""}
@@ -651,14 +653,14 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                                 setFilters(next);
                                 loadLogs(1, logs.pageSize, next);
                             }}
-                            style={{width: 136}}
+                            style={{width: isPhone ? "100%" : 136}}
                         />
                     </Space>
                     <Typography.Text type="secondary">共 {logs.total} 条</Typography.Text>
                 </Flex>
                 <Table
                     rowKey="id"
-                    size="middle"
+                    size={isPhone ? "small" : "middle"}
                     loading={loading}
                     columns={columns}
                     dataSource={logs.rows}
@@ -677,7 +679,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             <Drawer
                 title="统计设置"
                 open={settingOpen}
-                width={420}
+                width={isPhone ? "100%" : 420}
                 onClose={() => setSettingOpen(false)}
                 extra={<Button type="primary" onClick={saveSetting}>保存</Button>}
             >
@@ -719,7 +721,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                     icon={<ReloadOutlined/>}
                     loading={channelLoading}
                     onClick={loadNotificationChannels}
-                    style={{ marginBottom: 18 }}
+                    style={{ marginBottom: 18, width: isPhone ? "100%" : undefined }}
                 >
                     重新加载通知渠道
                 </Button>
@@ -729,7 +731,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                     </Typography.Text>
                     <Input.TextArea readOnly value={embedCode} rows={2}/>
                     <Button
-                        style={{ marginTop: 8 }}
+                        style={{ marginTop: 8, width: isPhone ? "100%" : undefined }}
                         icon={<CopyOutlined/>}
                         onClick={() => {
                             navigator.clipboard?.writeText(embedCode);
@@ -759,7 +761,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             <Drawer
                 title="访问详情"
                 open={detail !== null}
-                width={560}
+                width={isPhone ? "100%" : 560}
                 onClose={() => setDetail(null)}
             >
                 {detail && (
