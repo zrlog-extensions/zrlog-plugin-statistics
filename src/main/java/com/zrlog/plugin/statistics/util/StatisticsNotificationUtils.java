@@ -44,7 +44,7 @@ public class StatisticsNotificationUtils {
         request.setEventType("statistics.daily_report.failed");
         request.setNotificationType("statistics");
         request.setChannels(StatisticsNotificationChannels.normalize(channels).failedChannels());
-        request.setTitle("[ZrLog 统计日报] 生成失败");
+        request.setTitle("[统计日报] 生成失败");
         request.setContent(TEMPLATE_RENDER.render("/notification/statistics-daily-report-failure",
                 session.getPlugin(), failureTemplateData(errorMessage)));
         request.setLevel("warning");
@@ -64,7 +64,7 @@ public class StatisticsNotificationUtils {
         request.setEventType("statistics.daily_report.generated");
         request.setNotificationType("statistics");
         request.setChannels(StatisticsNotificationChannels.normalize(channels).dailyChannels());
-        request.setTitle("[ZrLog 统计日报] " + row.getDate() + " PV " + row.getPv() + " / UV " + row.getUv());
+        request.setTitle("[统计日报] " + row.getDate() + " PV " + row.getPv() + " / UV " + row.getUv());
         request.setContent(TEMPLATE_RENDER.render("/notification/statistics-daily-report",
                 session.getPlugin(), templateData(row, store == null ? "" : store.getUpdatedAt())));
         request.setLevel("info");
