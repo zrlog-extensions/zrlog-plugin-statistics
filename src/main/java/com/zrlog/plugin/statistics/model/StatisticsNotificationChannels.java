@@ -6,13 +6,12 @@ import java.util.List;
 
 public class StatisticsNotificationChannels {
 
-    public static final String STORE_KEY = "plugin.statistics.notification.channels";
-    public static final String SCHEMA = STORE_KEY;
+    public static final String DAILY_CHANNELS_KEY = "notificationDailyChannels";
+    public static final String FAILED_CHANNELS_KEY = "notificationFailedChannels";
     private static final List<String> FALLBACK_CHANNELS = Arrays.asList("email");
 
-    private String schema = SCHEMA;
-    private int version = 1;
-    private StatisticsNotificationChannelData data = new StatisticsNotificationChannelData();
+    private List<String> dailyChannels = new ArrayList<String>(FALLBACK_CHANNELS);
+    private List<String> failedChannels = new ArrayList<String>(FALLBACK_CHANNELS);
 
     public static StatisticsNotificationChannels defaults() {
         return normalize(new StatisticsNotificationChannels());
@@ -20,26 +19,28 @@ public class StatisticsNotificationChannels {
 
     public static StatisticsNotificationChannels normalize(StatisticsNotificationChannels channels) {
         StatisticsNotificationChannels normalized = channels == null ? new StatisticsNotificationChannels() : channels;
-        normalized.setSchema(SCHEMA);
-        if (normalized.getVersion() <= 0) {
-            normalized.setVersion(1);
-        }
-        StatisticsNotificationChannelData data = normalized.getData();
-        if (data == null) {
-            data = new StatisticsNotificationChannelData();
-            normalized.setData(data);
-        }
-        data.setDailyChannels(normalizeChannels(data.getDailyChannels(), FALLBACK_CHANNELS));
-        data.setFailedChannels(normalizeChannels(data.getFailedChannels(), data.getDailyChannels()));
+        normalized.setDailyChannels(normalizeChannels(normalized.getDailyChannels(), FALLBACK_CHANNELS));
+        normalized.setFailedChannels(normalizeChannels(normalized.getFailedChannels(), normalized.getDailyChannels()));
         return normalized;
     }
 
     public List<String> dailyChannels() {
-        return copy(normalize(this).getData().getDailyChannels());
+        return copy(normalize(this).getDailyChannels());
     }
 
     public List<String> failedChannels() {
-        return copy(normalize(this).getData().getFailedChannels());
+        return copy(normalize(this).getFailedChannels());
+    }
+
+    public static List<String> decodeChannels(String text, List<String> fallback) {
+        if (text == null || text.trim().isEmpty()) {
+            return normalizeChannels(null, fallback);
+        }
+        return normalizeChannels(Arrays.asList(text.split(",")), fallback);
+    }
+
+    public static String encodeChannels(List<String> channels) {
+        return String.join(",", normalizeChannels(channels, FALLBACK_CHANNELS));
     }
 
     private static List<String> normalizeChannels(List<String> channels, List<String> fallback) {
@@ -65,48 +66,19 @@ public class StatisticsNotificationChannels {
         return new ArrayList<String>(values == null || values.isEmpty() ? FALLBACK_CHANNELS : values);
     }
 
-    public String getSchema() {
-        return schema;
+    public List<String> getDailyChannels() {
+        return dailyChannels;
     }
 
-    public void setSchema(String schema) {
-        this.schema = schema;
+    public void setDailyChannels(List<String> dailyChannels) {
+        this.dailyChannels = dailyChannels;
     }
 
-    public int getVersion() {
-        return version;
+    public List<String> getFailedChannels() {
+        return failedChannels;
     }
 
-    public void setVersion(int version) {
-        this.version = version;
-    }
-
-    public StatisticsNotificationChannelData getData() {
-        return data;
-    }
-
-    public void setData(StatisticsNotificationChannelData data) {
-        this.data = data;
-    }
-
-    public static class StatisticsNotificationChannelData {
-        private List<String> dailyChannels = new ArrayList<String>(FALLBACK_CHANNELS);
-        private List<String> failedChannels = new ArrayList<String>(FALLBACK_CHANNELS);
-
-        public List<String> getDailyChannels() {
-            return dailyChannels;
-        }
-
-        public void setDailyChannels(List<String> dailyChannels) {
-            this.dailyChannels = dailyChannels;
-        }
-
-        public List<String> getFailedChannels() {
-            return failedChannels;
-        }
-
-        public void setFailedChannels(List<String> failedChannels) {
-            this.failedChannels = failedChannels;
-        }
+    public void setFailedChannels(List<String> failedChannels) {
+        this.failedChannels = failedChannels;
     }
 }

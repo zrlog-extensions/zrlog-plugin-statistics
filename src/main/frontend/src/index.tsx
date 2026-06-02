@@ -29,12 +29,8 @@ export interface StatisticsConfig {
 }
 
 export interface StatisticsNotificationChannels {
-    schema: string;
-    version: number;
-    data: {
-        dailyChannels: string[];
-        failedChannels: string[];
-    };
+    dailyChannels: string[];
+    failedChannels: string[];
 }
 
 export interface NotificationProviderRow {

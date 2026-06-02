@@ -27,8 +27,7 @@ public class GraalvmAgentApplication {
         PluginNativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(StatisticsConfig.class,
                 StatisticsDailySiteData.class, StatisticsDailySiteDataStore.class,
                 StatisticsLogEntry.class, StatisticsLogStore.class,
-                StatisticsNotificationChannels.class,
-                StatisticsNotificationChannels.StatisticsNotificationChannelData.class));
+                StatisticsNotificationChannels.class));
         String basePath = System.getProperty("user.dir").replace("\\target","").replace("/target", "");
         File file = new File(basePath + "/src/main/resources");
         PluginNativeImageUtils.doLoopResourceLoad(file.listFiles(), file.getPath()  + "/", "/");

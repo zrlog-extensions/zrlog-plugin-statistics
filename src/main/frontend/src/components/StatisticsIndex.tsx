@@ -56,12 +56,8 @@ type StatisticsSettingFormValues = StatisticsConfig & {
 }
 
 const defaultNotificationChannels = (): StatisticsNotificationChannels => ({
-    schema: "plugin.statistics.notification.channels",
-    version: 1,
-    data: {
-        dailyChannels: ["email"],
-        failedChannels: ["email"],
-    },
+    dailyChannels: ["email"],
+    failedChannels: ["email"],
 });
 
 const retentionOptions = [
@@ -283,8 +279,8 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             setNotificationChannels(info.settings || defaultNotificationChannels());
             setNotificationProviders(info.providers || []);
             const values = new Set((info.providers || []).map(row => row.channel).filter(Boolean));
-            const dailyChannels = (info.settings?.data?.dailyChannels || []).filter(channel => values.has(channel));
-            const failedChannels = (info.settings?.data?.failedChannels || []).filter(channel => values.has(channel));
+            const dailyChannels = (info.settings?.dailyChannels || []).filter(channel => values.has(channel));
+            const failedChannels = (info.settings?.failedChannels || []).filter(channel => values.has(channel));
             form.setFieldsValue({
                 dailyChannels,
                 failedChannels: failedChannels.length > 0 ? failedChannels : dailyChannels,
@@ -299,8 +295,8 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const openSetting = () => {
         form.setFieldsValue({
             ...config,
-            dailyChannels: notificationChannels.data?.dailyChannels || ["email"],
-            failedChannels: notificationChannels.data?.failedChannels || notificationChannels.data?.dailyChannels || ["email"],
+            dailyChannels: notificationChannels.dailyChannels || ["email"],
+            failedChannels: notificationChannels.failedChannels || notificationChannels.dailyChannels || ["email"],
         });
         setSettingOpen(true);
         loadNotificationChannels();
