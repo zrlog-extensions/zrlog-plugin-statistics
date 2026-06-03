@@ -787,17 +787,24 @@ public class StatisticsRepository {
         return value == null ? "" : value;
     }
 
-    private String clientIp(Map<String, String> header) {
-        String forwarded = headerValue(header, "X-Forwarded-For", "X-Forwarded-For");
-        if (notBlank(forwarded)) {
-            int comma = forwarded.indexOf(',');
-            return comma > 0 ? forwarded.substring(0, comma).trim() : forwarded.trim();
-        }
+    String clientIp(Map<String, String> header) {
         String realIp = headerValue(header, "X-Real-IP", "X-Real-IP");
         if (notBlank(realIp)) {
-            return realIp;
+            return firstIp(realIp);
         }
-        return headerValue(header, "CF-Connecting-IP", "CF-Connecting-IP");
+        String forwarded = headerValue(header, "X-Forwarded-For", "X-Forwarded-For");
+        if (notBlank(forwarded)) {
+            return firstIp(forwarded);
+        }
+        return firstIp(headerValue(header, "CF-Connecting-IP", "CF-Connecting-IP"));
+    }
+
+    private String firstIp(String value) {
+        if (value == null) {
+            return "";
+        }
+        int comma = value.indexOf(',');
+        return comma >= 0 ? value.substring(0, comma).trim() : value.trim();
     }
 
     private Map<String, String> cookies(Map<String, String> header) {

@@ -40,6 +40,12 @@
             <artifactId>zrlog-plugin-common</artifactId>
             <version>4.0.5-SNAPSHOT</version>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
