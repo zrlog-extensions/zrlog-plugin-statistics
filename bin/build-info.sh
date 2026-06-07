@@ -59,6 +59,12 @@ fi
 if [ -n "${artifactDir}" ]; then
   mkdir -p "${artifactDir}"
   cp "${generatedProperties}" "${artifactDir}/${shortName}.properties"
+  previewImage="src/main/resources/preview-image.svg"
+  if [ ! -f "${previewImage}" ]; then
+    echo "plugin preview image not found: ${previewImage}" >&2
+    exit 1
+  fi
+  cp "${previewImage}" "${artifactDir}/${shortName}.svg"
 fi
 
 echo "pluginVersion=${pluginVersion}"
