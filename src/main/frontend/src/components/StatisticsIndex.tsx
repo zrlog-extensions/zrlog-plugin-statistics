@@ -314,7 +314,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
             const dailyChannels = filterAvailableChannels(values.dailyChannels);
             const failedChannels = filterAvailableChannels(values.failedChannels || values.dailyChannels);
             if (dailyChannels.length === 0) {
-                throw new Error("请选择 plugin-core 中可用的通知渠道");
+                throw new Error("请选择可用的通知渠道");
             }
             const savedChannels = await request<StatisticsNotificationChannelInfo>("saveNotificationChannels", {
                 dailyChannels: dailyChannels.join(","),
@@ -714,7 +714,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                         type="warning"
                         showIcon
                         style={{ marginTop: 4, marginBottom: 18 }}
-                        message="plugin-core 当前没有可用通知渠道"
+                        message="当前没有可用通知渠道"
                     />
                 )}
                 <Button
