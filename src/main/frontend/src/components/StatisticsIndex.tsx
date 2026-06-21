@@ -464,7 +464,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     ], []);
 
     const emptyDescription = (
-        <span>暂无访问数据，可能是统计代码还没有在管理后台的其他设置中生效，也可能当前还没有访问记录。</span>
+        <span>暂无访问数据，可能是统计代码还没有在管理后台的其他设置中生效，也可能当前还没有访问记录</span>
     );
 
     return (
