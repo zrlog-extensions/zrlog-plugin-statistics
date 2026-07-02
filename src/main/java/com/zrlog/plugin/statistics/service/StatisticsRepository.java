@@ -4,12 +4,17 @@ import com.google.gson.Gson;
 import com.zrlog.plugin.IOSession;
 import com.zrlog.plugin.common.LoggerUtil;
 import com.zrlog.plugin.common.SessionKvRepository;
+import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.statistics.model.StatisticsConfig;
+import com.zrlog.plugin.statistics.model.StatisticsConfigValues;
 import com.zrlog.plugin.statistics.model.StatisticsDailySiteData;
 import com.zrlog.plugin.statistics.model.StatisticsDailySiteDataStore;
 import com.zrlog.plugin.statistics.model.StatisticsLogEntry;
 import com.zrlog.plugin.statistics.model.StatisticsLogStore;
+import com.zrlog.plugin.statistics.model.StatisticsRequestParams;
+import com.zrlog.plugin.statistics.model.WebsiteKeyRequest;
+import com.zrlog.plugin.type.ActionType;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -120,19 +125,26 @@ public class StatisticsRepository {
     }
 
     public synchronized StatisticsConfig readConfig(IOSession session) {
-        Map<String, Object> responseMap = SessionKvRepository.of(session).read(CONFIG_KEYS);
+        StatisticsConfigValues response = session.getResponseSync(ContentType.JSON, WebsiteKeyRequest.of(CONFIG_KEYS),
+                ActionType.GET_WEBSITE, StatisticsConfigValues.class);
+        if (response == null) {
+            response = new StatisticsConfigValues();
+        }
         StatisticsConfig config = new StatisticsConfig();
-        config.setHost(stringValue(responseMap.get(CONFIG_HOST_KEY)));
-        config.setRetentionDays(normalizeRetentionDays(stringValue(responseMap.get(CONFIG_RETENTION_DAYS_KEY))));
+        config.setHost(defaultText(response.getHost(), ""));
+        config.setRetentionDays(normalizeRetentionDays(response.getStatisticsRetentionDays()));
         return config;
     }
 
-    public synchronized StatisticsConfig saveConfig(IOSession session, Map<String, Object> params) {
+    public synchronized StatisticsConfig saveConfig(IOSession session, StatisticsRequestParams params) {
+        if (params == null) {
+            params = new StatisticsRequestParams();
+        }
         StatisticsConfig config = new StatisticsConfig();
-        config.setHost(limit(stringValue(params.get(CONFIG_HOST_KEY)), 180));
-        String retentionDays = stringValue(params.get(CONFIG_RETENTION_DAYS_KEY));
+        config.setHost(limit(defaultText(params.getHost(), ""), 180));
+        String retentionDays = defaultText(params.getStatisticsRetentionDays(), "");
         if (!notBlank(retentionDays)) {
-            retentionDays = stringValue(params.get("retentionDays"));
+            retentionDays = defaultText(params.getRetentionDays(), "");
         }
         config.setRetentionDays(normalizeRetentionDays(retentionDays));
         Map<String, String> request = new HashMap<>();
@@ -204,12 +216,15 @@ public class StatisticsRepository {
         return data;
     }
 
-    public synchronized Map<String, Object> page(IOSession session, Map<String, Object> params, int retentionDays) {
-        int page = Math.max(1, parseInt(stringValue(params.get("page")), 1));
-        int pageSize = Math.max(1, Math.min(100, parseInt(stringValue(params.get("pageSize")), 10)));
-        String keyword = stringValue(params.get("keyword")).toLowerCase();
-        String source = stringValue(params.get("source"));
-        String alias = stringValue(params.get("alias")).toLowerCase();
+    public synchronized Map<String, Object> page(IOSession session, StatisticsRequestParams params, int retentionDays) {
+        if (params == null) {
+            params = new StatisticsRequestParams();
+        }
+        int page = Math.max(1, parseInt(defaultText(params.getPage(), ""), 1));
+        int pageSize = Math.max(1, Math.min(100, parseInt(defaultText(params.getPageSize(), ""), 10)));
+        String keyword = defaultText(params.getKeyword(), "").toLowerCase();
+        String source = defaultText(params.getSource(), "");
+        String alias = defaultText(params.getAlias(), "").toLowerCase();
         List<StatisticsLogEntry> logs = listRecentLogs(session, retentionDays);
         List<Map<String, Object>> filtered = new ArrayList<>();
         for (int i = logs.size() - 1; i >= 0; i--) {

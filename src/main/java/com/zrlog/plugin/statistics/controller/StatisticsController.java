@@ -13,8 +13,14 @@ import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.message.NotificationChannelProvider;
 import com.zrlog.plugin.message.NotificationChannelQueryResult;
+import com.zrlog.plugin.statistics.model.StatisticsActionResponse;
+import com.zrlog.plugin.statistics.model.StatisticsApiResponse;
+import com.zrlog.plugin.statistics.model.StatisticsArticleVisitRequest;
 import com.zrlog.plugin.statistics.model.StatisticsConfig;
+import com.zrlog.plugin.statistics.model.StatisticsNotificationChannelInfo;
 import com.zrlog.plugin.statistics.model.StatisticsNotificationChannels;
+import com.zrlog.plugin.statistics.model.StatisticsPageData;
+import com.zrlog.plugin.statistics.model.StatisticsRequestParams;
 import com.zrlog.plugin.statistics.service.StatisticsNotificationSettingRepository;
 import com.zrlog.plugin.statistics.service.StatisticsRepository;
 import com.zrlog.plugin.type.ActionType;
@@ -29,7 +35,6 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -56,7 +61,7 @@ public class StatisticsController {
 
     public void update() {
         StatisticsConfig config = repository.saveConfig(session, params());
-        response(successMap(config));
+        response(StatisticsApiResponse.success(config));
     }
 
     public void index() {
@@ -72,33 +77,33 @@ public class StatisticsController {
 
     public void list() {
         StatisticsConfig config = repository.readConfig(session);
-        response(successMap(repository.page(session, params(), config.getRetentionDays())));
+        response(StatisticsApiResponse.success(repository.page(session, params(), config.getRetentionDays())));
     }
 
     public void notificationChannels() {
         try {
-            response(successMap(notificationChannelInfo()));
+            response(StatisticsApiResponse.success(notificationChannelInfo()));
         } catch (Exception e) {
-            response(errorMap(e.getMessage()));
+            response(StatisticsApiResponse.error(errorMessage(e.getMessage())));
         }
     }
 
     public void saveNotificationChannels() {
-        Map<String, Object> params = params();
+        StatisticsRequestParams params = params();
         List<NotificationChannelProvider> providers;
         try {
             providers = queryNotificationProviders();
         } catch (Exception e) {
-            response(errorMap(e.getMessage()));
+            response(StatisticsApiResponse.error(errorMessage(e.getMessage())));
             return;
         }
         Set<String> availableChannels = availableChannels(providers);
-        List<String> dailyChannels = configuredChannels(params.get("dailyChannels"), availableChannels);
+        List<String> dailyChannels = configuredChannels(params.getDailyChannels(), availableChannels);
         if (dailyChannels.isEmpty()) {
-            response(errorMap("请选择 plugin-core 中可用的通知渠道"));
+            response(StatisticsApiResponse.error("请选择 plugin-core 中可用的通知渠道"));
             return;
         }
-        List<String> failedChannels = configuredChannels(params.get("failedChannels"), availableChannels);
+        List<String> failedChannels = configuredChannels(params.getFailedChannels(), availableChannels);
         if (failedChannels.isEmpty()) {
             failedChannels = dailyChannels;
         }
@@ -106,27 +111,18 @@ public class StatisticsController {
         channels.setDailyChannels(dailyChannels);
         channels.setFailedChannels(failedChannels);
         notificationSettingRepository.save(session, channels);
-        Map<String, Object> result = new HashMap<>();
-        result.put("settings", notificationSettingRepository.get(session));
-        result.put("providers", providers);
-        response(successMap(result));
+        StatisticsNotificationChannelInfo result = new StatisticsNotificationChannelInfo();
+        result.setSettings(notificationSettingRepository.get(session));
+        result.setProviders(providers);
+        response(StatisticsApiResponse.success(result));
     }
 
     public void surface() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("data", repository.surfaceData(session));
-        response(response);
+        response(StatisticsApiResponse.success(repository.surfaceData(session)));
     }
 
     public void surfaceAction() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        Map<String, Object> data = new HashMap<>();
-        data.put("message", "已刷新统计");
-        data.put("surface", repository.surfaceData(session));
-        response.put("data", data);
-        response(response);
+        response(StatisticsApiResponse.success(new StatisticsActionResponse("已刷新统计", repository.surfaceData(session))));
     }
 
     public void widget() {
@@ -137,7 +133,6 @@ public class StatisticsController {
     }
 
     public void img() {
-        Map<String, Object> keyMap = new HashMap<>();
         String[] path = requestInfo.getParam().get("path");
         if (path == null || path.length == 0) {
             if (RunConstants.runType == RunType.DEV) {
@@ -147,9 +142,9 @@ public class StatisticsController {
             return;
         }
         String aliasKey = URLDecoder.decode(path[0], StandardCharsets.UTF_8).replace("/", "").replace(".html", "");
-        keyMap.put("alias", aliasKey);
         repository.recordVisit(session, requestInfo, aliasKey);
-        session.sendMsg(ContentType.JSON, keyMap, ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
+        session.sendMsg(ContentType.JSON, new StatisticsArticleVisitRequest(aliasKey),
+                ActionType.ARTICLE_VISIT_COUNT_ADD_ONE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, new IMsgPacketCallBack() {
             @Override
             public void handler(MsgPacket responseMsgPacket) {
                 session.sendMsg(new MsgPacket(SVG_STR, ContentType.IMAGE_SVG_XML, MsgPacketStatus.RESPONSE_SUCCESS, requestPacket.getMsgId(), requestPacket.getMethodStr()));
@@ -160,33 +155,33 @@ public class StatisticsController {
         });
     }
 
-    private void response(Map<String, Object> map) {
-        session.sendMsg(ContentType.JSON, map, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+    private void response(StatisticsApiResponse<?> response) {
+        session.sendMsg(ContentType.JSON, response, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
     }
 
-    private Map<String, Object> pageData() {
+    private StatisticsApiResponse<StatisticsPageData> pageData() {
         StatisticsConfig config = repository.readConfig(session);
         Map<String, Object> overview = repository.overview(session, config.getRetentionDays());
-        Map<String, Object> firstPageParams = new HashMap<>();
-        firstPageParams.put("page", "1");
-        firstPageParams.put("pageSize", "10");
-        Map<String, Object> data = new HashMap<>();
-        data.put("dark", requestInfo.isDarkMode());
-        data.put("colorPrimary", requestInfo.getAdminColorPrimary());
-        data.put("plugin", session.getPlugin());
-        data.put("config", config);
-        data.put("notificationChannels", notificationSettingRepository.get(session));
-        data.put("summary", overview.get("summary"));
-        data.put("charts", overview.get("charts"));
-        data.put("dailySiteData", overview.get("dailySiteData"));
-        data.put("logs", repository.page(session, firstPageParams, config.getRetentionDays()));
-        return successMap(data);
+        StatisticsRequestParams firstPageParams = new StatisticsRequestParams();
+        firstPageParams.setPage("1");
+        firstPageParams.setPageSize("10");
+        StatisticsPageData data = new StatisticsPageData();
+        data.setDark(requestInfo.isDarkMode());
+        data.setColorPrimary(requestInfo.getAdminColorPrimary());
+        data.setPlugin(session.getPlugin());
+        data.setConfig(config);
+        data.setNotificationChannels(notificationSettingRepository.get(session));
+        data.setSummary(overview.get("summary"));
+        data.setCharts(overview.get("charts"));
+        data.setDailySiteData(overview.get("dailySiteData"));
+        data.setLogs(repository.page(session, firstPageParams, config.getRetentionDays()));
+        return StatisticsApiResponse.success(data);
     }
 
-    private Map<String, Object> notificationChannelInfo() {
-        Map<String, Object> data = new HashMap<>();
-        data.put("settings", notificationSettingRepository.get(session));
-        data.put("providers", queryNotificationProviders());
+    private StatisticsNotificationChannelInfo notificationChannelInfo() {
+        StatisticsNotificationChannelInfo data = new StatisticsNotificationChannelInfo();
+        data.setSettings(notificationSettingRepository.get(session));
+        data.setProviders(queryNotificationProviders());
         return data;
     }
 
@@ -219,31 +214,27 @@ public class StatisticsController {
         return result;
     }
 
-    private Map<String, Object> params() {
+    private StatisticsRequestParams params() {
         if (requestInfo.getRequestBody() != null && requestInfo.getRequestBody().length > 0) {
             String body = new String(requestInfo.getRequestBody(), StandardCharsets.UTF_8);
             if (body.trim().startsWith("{")) {
-                return gson.fromJson(body, Map.class);
+                StatisticsRequestParams params = gson.fromJson(body, StatisticsRequestParams.class);
+                return params == null ? new StatisticsRequestParams() : params;
             }
         }
-        if (requestInfo.getParam() == null) {
-            return new HashMap<>();
+        return StatisticsRequestParams.fromParams(this::hasParam, this::paramObject);
+    }
+
+    private boolean hasParam(String key) {
+        return requestInfo.getParam() != null && requestInfo.getParam().containsKey(key);
+    }
+
+    private Object paramObject(String key) {
+        if (!hasParam(key)) {
+            return null;
         }
-        return requestInfo.simpleParam();
-    }
-
-    private Map<String, Object> successMap(Object data) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("success", true);
-        map.put("data", data);
-        return map;
-    }
-
-    private Map<String, Object> errorMap(String message) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("success", false);
-        map.put("message", notBlank(message) ? message : "操作失败");
-        return map;
+        String[] values = requestInfo.getParam().get(key);
+        return values.length == 1 ? values[0] : values;
     }
 
     private boolean isDarkMode() {
@@ -269,6 +260,10 @@ public class StatisticsController {
         if (value == null) {
             return "";
         }
+        if (value instanceof String[]) {
+            String[] values = (String[]) value;
+            return values.length == 0 ? "" : values[0];
+        }
         if (value instanceof List && !((List) value).isEmpty()) {
             return String.valueOf(((List) value).get(0));
         }
@@ -276,6 +271,9 @@ public class StatisticsController {
     }
 
     private List<String> channelList(Object value) {
+        if (value instanceof String[]) {
+            return Arrays.asList((String[]) value);
+        }
         if (value instanceof List) {
             List<String> result = new ArrayList<>();
             for (Object item : (List) value) {
@@ -296,5 +294,9 @@ public class StatisticsController {
                 result.add(value.trim());
             }
         }
+    }
+
+    private String errorMessage(String message) {
+        return notBlank(message) ? message : "操作失败";
     }
 }
