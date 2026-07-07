@@ -4,8 +4,8 @@
   "homepage": ".",
   "private": true,
   "dependencies": {
-    "@ant-design/cssinjs": "1.11.1",
-    "@ant-design/icons": "5.3.6",
+    "@ant-design/cssinjs": "2.1.2",
+    "@ant-design/icons": "6.2.3",
     "@ant-design/plots": "2.6.8",
     "antd": "6.4.3",
     "axios": "1.6.7",
