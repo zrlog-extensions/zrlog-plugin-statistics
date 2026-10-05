@@ -19,13 +19,6 @@
 
     <repositories>
         <repository>
-            <id>central-snapshots</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-        <repository>
             <id>central-center</id>
             <url>https://repo1.maven.org/maven2/</url>
             <releases>
@@ -38,7 +31,7 @@
         <dependency>
             <groupId>com.hibegin</groupId>
             <artifactId>zrlog-plugin-common</artifactId>
-            <version>4.0.5-SNAPSHOT</version>
+            <version>4.0.5</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -64,6 +57,28 @@
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>release-versions</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireReleaseVersion/>
+                                <requireReleaseDeps>
+                                    <onlyWhenRelease>false</onlyWhenRelease>
+                                    <searchTransitive>true</searchTransitive>
+                                    <failWhenParentIsSnapshot>true</failWhenParentIsSnapshot>
+                                </requireReleaseDeps>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>2.6</version>
