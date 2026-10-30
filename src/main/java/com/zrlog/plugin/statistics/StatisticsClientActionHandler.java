@@ -8,6 +8,10 @@ import com.zrlog.plugin.data.codec.MsgPacket;
 
 public class StatisticsClientActionHandler extends ClientActionHandler {
 
+    /** Services wait for their owned work; legacy HTTP callbacks do not declare completed view rendering. */
+    @Override
+    public int capabilityLifecycleVersion() { return 1; }
+
     @Override
     public void httpMethod(IOSession session, MsgPacket msgPacket) {
         HttpRequestInfo httpRequestInfo = new Gson().fromJson(msgPacket.getDataStr(), HttpRequestInfo.class);
