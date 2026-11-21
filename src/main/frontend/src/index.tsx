@@ -1,13 +1,9 @@
-import {legacyLogicalPropertiesTransformer, StyleProvider} from "@ant-design/cssinjs";
-import {App, ConfigProvider, Layout, theme} from "antd";
-import zhCN from "antd/es/locale/zh_CN";
 import axios from "axios";
 import {useEffect, useState} from "react";
 import {createRoot} from "react-dom/client";
 import AppBase from "./AppBase";
-
-const {darkAlgorithm, defaultAlgorithm} = theme;
-const {Content} = Layout;
+import {PluginThemeProvider} from "./PluginThemeProvider";
+import type {PluginAppearance} from "./PluginThemeProvider";
 
 export interface Plugin {
     id: string;
@@ -119,7 +115,7 @@ export interface PageData<T> {
     pageSize: number;
 }
 
-export interface StatisticsInfoResponse {
+export interface StatisticsInfoResponse extends PluginAppearance {
     dark: boolean;
     colorPrimary: string;
     plugin: Plugin;
@@ -165,23 +161,9 @@ const Index = () => {
     }
 
     return (
-        <ConfigProvider
-            locale={zhCN}
-            theme={{
-                algorithm: response.data.dark ? darkAlgorithm : defaultAlgorithm,
-                token: {
-                    colorPrimary: response.data.colorPrimary || "#1677ff",
-                },
-            }}
-        >
-            <StyleProvider transformers={[legacyLogicalPropertiesTransformer]}>
-                <Content style={{minHeight: "100vh", backgroundColor: response.data.dark ? "#141414" : undefined, color: response.data.dark ? "#dfdfdf" : undefined}}>
-                    <App>
-                        <AppBase pluginInfo={response.data}/>
-                    </App>
-                </Content>
-            </StyleProvider>
-        </ConfigProvider>
+        <PluginThemeProvider page={response.data}>
+            <AppBase pluginInfo={response.data}/>
+        </PluginThemeProvider>
     );
 };
 

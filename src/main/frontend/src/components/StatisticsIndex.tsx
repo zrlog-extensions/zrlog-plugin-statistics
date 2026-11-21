@@ -1,4 +1,12 @@
-import {CopyOutlined, ReloadOutlined, SettingOutlined} from "@ant-design/icons";
+import {getUiThemeDefinition} from "@zrlog/ui/themes";
+import Input from "@zrlog/ui/antd/Input";
+import Table from "@zrlog/ui/antd/Table";
+import Tag from "@zrlog/ui/antd/Tag";
+import Typography from "@zrlog/ui/antd/Typography";
+import {useUiApp} from "@zrlog/ui/feedback";
+import CopyOutlined from "@zrlog/ui/icons/copy";
+import ReloadOutlined from "@zrlog/ui/icons/refresh";
+import SettingOutlined from "@zrlog/ui/icons/settings";
 import {Bar, Line, Pie} from "@ant-design/plots";
 import type {ColumnsType} from "antd/es/table";
 import {
@@ -12,16 +20,11 @@ import {
     Flex,
     Form,
     Grid,
-    Input,
     Row,
     Select,
     Space,
     Statistic,
-    Table,
-    Tag,
     Tooltip,
-    Typography,
-    message,
     theme,
 } from "antd";
 import axios from "axios";
@@ -145,7 +148,11 @@ const topLabel = (name: string, value: number) => {
     return value > 0 ? `${name} (${value})` : name;
 };
 
-const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: string }> = ({chart, colorPrimary}) => {
+const ChartBlock: FunctionComponent<{
+    chart: StatisticsChart;
+    chartTheme: "classic" | "classicDark";
+    colorPrimary: string;
+}> = ({chart, chartTheme, colorPrimary}) => {
     if (chart.data.length === 0) {
         return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据"/>;
     }
@@ -154,6 +161,7 @@ const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: stri
         height: chart.height,
         autoFit: true,
         colorField: chart.nameField,
+        theme: chartTheme,
     } as any;
     if (chart.type === "line") {
         return (
@@ -162,8 +170,11 @@ const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: stri
                 xField={chart.xField}
                 yField={chart.yField}
                 colorField={chart.nameField}
-                color={chart.nameField ? undefined : colorPrimary}
-                point={{size: 3}}
+                style={chart.nameField ? undefined : {stroke: colorPrimary}}
+                point={{
+                    size: 3,
+                    style: chart.nameField ? undefined : {fill: colorPrimary, stroke: colorPrimary},
+                }}
             />
         );
     }
@@ -174,7 +185,7 @@ const ChartBlock: FunctionComponent<{ chart: StatisticsChart; colorPrimary: stri
                 xField={chart.yField}
                 yField={chart.xField}
                 colorField={undefined}
-                color={colorPrimary}
+                style={{fill: colorPrimary}}
                 scrollbar={{y: chart.data.length > 6 ? {} : undefined}}
             />
         );
@@ -207,8 +218,11 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
     const [settingOpen, setSettingOpen] = useState(false);
     const [detail, setDetail] = useState<StatisticsLogRow | null>(null);
     const [form] = Form.useForm<StatisticsSettingFormValues>();
-    const [messageApi, contextHolder] = message.useMessage();
+    const {message: messageApi} = useUiApp();
     const {token} = theme.useToken();
+    const {colorMode} = getUiThemeDefinition(data.appearance?.theme?.trim());
+    const dark = colorMode === "selectable" ? (data.appearance?.dark ?? data.dark) : colorMode === "dark";
+    const chartTheme = dark ? "classicDark" : "classic";
     const screens = Grid.useBreakpoint();
     const isPhone = Boolean(screens.xs && !screens.sm);
     const isCompact = !screens.lg;
@@ -477,7 +491,6 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                 boxSizing: "border-box",
             }}
         >
-            {contextHolder}
             <Flex
                 justify="space-between"
                 align={isCompact ? "stretch" : "flex-start"}
@@ -563,7 +576,7 @@ const StatisticsIndex: FunctionComponent<StatisticsIndexProps> = ({data}) => {
                             <div style={{ marginBottom: 12, fontSize: 15, fontWeight: 600, color: token.colorTextHeading }}>
                                 {chart.title}
                             </div>
-                            <ChartBlock chart={chart} colorPrimary={data.colorPrimary || token.colorPrimary}/>
+                            <ChartBlock chart={chart} chartTheme={chartTheme} colorPrimary={token.colorPrimary}/>
                         </Card>
                     </Col>
                 ))}

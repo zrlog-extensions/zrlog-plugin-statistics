@@ -11,6 +11,7 @@ import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.HttpRequestInfo;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
+import com.zrlog.plugin.data.codec.PluginAppearance;
 import com.zrlog.plugin.message.NotificationChannelProvider;
 import com.zrlog.plugin.message.NotificationChannelQueryResult;
 import com.zrlog.plugin.statistics.model.StatisticsActionResponse;
@@ -66,7 +67,7 @@ public class StatisticsController {
 
     public void index() {
         Map<String, Object> data = new HashMap<>();
-        data.put("theme", isDarkMode() ? "dark" : "light");
+
         data.put("data", gson.toJson(pageData()));
         session.responseHtml("/templates/index", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
     }
@@ -166,6 +167,7 @@ public class StatisticsController {
         firstPageParams.setPage("1");
         firstPageParams.setPageSize("10");
         StatisticsPageData data = new StatisticsPageData();
+        data.setAppearance(PluginAppearance.from(requestInfo));
         data.setDark(requestInfo.isDarkMode());
         data.setColorPrimary(requestInfo.getAdminColorPrimary());
         data.setPlugin(session.getPlugin());

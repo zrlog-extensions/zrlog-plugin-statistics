@@ -1,8 +1,12 @@
 package com.zrlog.plugin.statistics.model;
 
+import com.zrlog.plugin.data.codec.PluginAppearance;
+
 import com.zrlog.plugin.message.Plugin;
 
 public class StatisticsPageData {
+
+    private PluginAppearance appearance;
 
     private boolean dark;
     private String colorPrimary;
@@ -84,5 +88,8 @@ public class StatisticsPageData {
 
     public void setLogs(Object logs) {
         this.logs = logs;
+    }
+    public void setAppearance(PluginAppearance appearance) {
+        this.appearance = appearance;
     }
 }
